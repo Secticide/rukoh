@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cargo build:*)",
+      "Bash(cmd:*)",
+      "Bash(PATH=\"/c/Users/secti/.cargo/bin:$PATH\" cargo clippy:*)",
+      "Bash(cargo run:*)",
+      "Bash(kill %1)"
+    ]
+  }
+}

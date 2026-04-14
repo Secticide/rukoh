@@ -1,0 +1,59 @@
+[package]
+name = "rukoh"
+version = "0.1.0"
+edition = "2021"
+
+[build-dependencies]
+glob = "0.3"
+
+[dependencies]
+bytemuck = { version = "1", features = ["derive"] }
+fontdue = "0.9"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "bmp", "tga"] }
+lewton = "0.10"
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_Graphics_Direct3D11",
+    "Win32_Graphics_Direct3D",
+    "Win32_Graphics_Dxgi",
+    "Win32_Graphics_Dxgi_Common",
+    "Win32_Graphics_Gdi",
+    "Win32_UI_Input_XboxController",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Performance",
+    "Win32_Media_Audio",
+    "Win32_Media_Audio_XAudio2"
+] }
+
+[[example]]
+name = "hello_window"
+path = "examples/hello_window.rs"
+
+[[example]]
+name = "input"
+path = "examples/input.rs"
+
+[[example]]
+name = "sprites"
+path = "examples/sprites.rs"
+
+[[example]]
+name = "camera"
+path = "examples/camera.rs"
+
+[[example]]
+name = "audio"
+path = "examples/audio.rs"
+
+[[example]]
+name = "gamepad"
+path = "examples/gamepad.rs"
+
+[[example]]
+name = "breakout"
+path = "examples/breakout.rs"
+
+[[example]]
+name = "bunnymark"
+path = "examples/bunnymark.rs"
