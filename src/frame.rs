@@ -60,17 +60,25 @@ impl<'a> Frame<'a> {
             tint,
             ..Default::default()
         };
-        self.rukoh
-            .batch
-            .draw_texture_ex(&texture.srv, texture.width, texture.height, &params);
+        self.rukoh.batch.draw_texture_ex(
+            &texture.srv,
+            texture.width,
+            texture.height,
+            texture.filter,
+            &params,
+        );
     }
 
     /// Draw a texture with full control over destination rect, source rect,
     /// rotation, pivot origin, and tint.
     pub fn draw_texture_ex(&mut self, texture: &Texture2D, params: &DrawParams) {
-        self.rukoh
-            .batch
-            .draw_texture_ex(&texture.srv, texture.width, texture.height, params);
+        self.rukoh.batch.draw_texture_ex(
+            &texture.srv,
+            texture.width,
+            texture.height,
+            texture.filter,
+            params,
+        );
     }
 
     /// Draw a filled solid-colour rectangle.

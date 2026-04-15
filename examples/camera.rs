@@ -1,6 +1,6 @@
 use rukoh::{
     graphics::Texture2D, Camera2D, Colour, DrawParams, Font, KeyCode, MouseButton, Rect,
-    RenderTarget, Rukoh, RukohConfig, Vec2, WindowMode,
+    RenderTarget, Rukoh, RukohConfig, TextureFilter, Vec2, WindowMode,
 };
 
 fn main() -> Result<(), rukoh::Error> {
@@ -30,7 +30,7 @@ fn main() -> Result<(), rukoh::Error> {
             px[i..i + 4].copy_from_slice(&[c, c, c, 255]);
         }
     }
-    let world_tex = Texture2D::from_pixels(&app, &px, TEX, TEX)?;
+    let world_tex = Texture2D::from_pixels(&app, &px, TEX, TEX, TextureFilter::Point)?;
 
     let font = Font::load(&app, include_bytes!("assets/lexend.ttf"), 20.0)?;
 

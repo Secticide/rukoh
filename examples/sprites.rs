@@ -1,6 +1,6 @@
 use rukoh::{
-    graphics::Texture2D, BlendMode, Colour, DrawParams, KeyCode, Rect, Rukoh, RukohConfig, Vec2,
-    WindowMode,
+    graphics::Texture2D, BlendMode, Colour, DrawParams, KeyCode, Rect, Rukoh, RukohConfig,
+    TextureFilter, Vec2, WindowMode,
 };
 
 fn main() -> Result<(), rukoh::Error> {
@@ -17,7 +17,11 @@ fn main() -> Result<(), rukoh::Error> {
     //
     // Texture2D::load accepts any &[u8] — use include_bytes! to embed the asset
     // at compile time, or read it at runtime for dev convenience.
-    let uv = Texture2D::load(&app, include_bytes!("assets/uv-texture.png"))?;
+    let uv = Texture2D::load(
+        &app,
+        include_bytes!("assets/uv-texture.png"),
+        TextureFilter::Bilinear,
+    )?;
 
     // Scale the texture so its longest side is at most 160 px.
     let uv_scale = 160.0 / uv.width.max(uv.height) as f32;
@@ -39,7 +43,7 @@ fn main() -> Result<(), rukoh::Error> {
             }
         }
     }
-    let checker = Texture2D::from_pixels(&app, &pixels, SIZE, SIZE)?;
+    let checker = Texture2D::from_pixels(&app, &pixels, SIZE, SIZE, TextureFilter::Point)?;
 
     // ── Sprite state ──────────────────────────────────────────────────────────
 

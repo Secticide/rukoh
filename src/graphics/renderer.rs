@@ -10,11 +10,11 @@ use windows::Win32::{
             D3D11_BIND_CONSTANT_BUFFER, D3D11_BIND_INDEX_BUFFER, D3D11_BIND_VERTEX_BUFFER,
             D3D11_BLEND, D3D11_BLEND_DESC, D3D11_BLEND_DEST_COLOR, D3D11_BLEND_INV_SRC_ALPHA,
             D3D11_BLEND_ONE, D3D11_BLEND_OP_ADD, D3D11_BLEND_SRC_ALPHA, D3D11_BUFFER_DESC,
-            D3D11_COLOR_WRITE_ENABLE_ALL, D3D11_CPU_ACCESS_WRITE, D3D11_FILTER_MIN_MAG_MIP_POINT,
-            D3D11_INPUT_ELEMENT_DESC, D3D11_INPUT_PER_VERTEX_DATA, D3D11_MAPPED_SUBRESOURCE,
-            D3D11_MAP_WRITE_DISCARD, D3D11_RENDER_TARGET_BLEND_DESC, D3D11_SAMPLER_DESC,
-            D3D11_SUBRESOURCE_DATA, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_USAGE_DYNAMIC,
-            D3D11_USAGE_IMMUTABLE,
+            D3D11_COLOR_WRITE_ENABLE_ALL, D3D11_CPU_ACCESS_WRITE, D3D11_FILTER_MIN_MAG_MIP_LINEAR,
+            D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_INPUT_ELEMENT_DESC, D3D11_INPUT_PER_VERTEX_DATA,
+            D3D11_MAPPED_SUBRESOURCE, D3D11_MAP_WRITE_DISCARD, D3D11_RENDER_TARGET_BLEND_DESC,
+            D3D11_SAMPLER_DESC, D3D11_SUBRESOURCE_DATA, D3D11_TEXTURE_ADDRESS_CLAMP,
+            D3D11_USAGE_DYNAMIC, D3D11_USAGE_IMMUTABLE,
         },
         Dxgi::Common::{
             DXGI_FORMAT_R32G32B32A32_FLOAT, DXGI_FORMAT_R32G32_FLOAT, DXGI_FORMAT_R32_UINT,
@@ -23,7 +23,7 @@ use windows::Win32::{
     },
 };
 
-use super::texture::Texture2D;
+use super::texture::{Texture2D, TextureFilter};
 use crate::{Colour, Error, Rect, Vec2};
 
 /// Vertex layout: 32 bytes per vertex.
@@ -102,7 +102,9 @@ pub struct SpriteBatch {
     vertex_shader: ID3D11VertexShader,
     pixel_shader: ID3D11PixelShader,
     input_layout: ID3D11InputLayout,
-    sampler: ID3D11SamplerState,
+    sampler_point: ID3D11SamplerState,
+    sampler_bilinear: ID3D11SamplerState,
+    current_filter: TextureFilter,
     blend_alpha: ID3D11BlendState,
     blend_additive: ID3D11BlendState,
     blend_multiplied: ID3D11BlendState,
@@ -139,7 +141,8 @@ impl SpriteBatch {
 
         let (vertex_shader, input_layout) = create_vertex_shader(device, vs_bytecode)?;
         let pixel_shader = create_pixel_shader(device, ps_bytecode)?;
-        let sampler = create_sampler(device)?;
+        let sampler_point = create_sampler(device, D3D11_FILTER_MIN_MAG_MIP_POINT)?;
+        let sampler_bilinear = create_sampler(device, D3D11_FILTER_MIN_MAG_MIP_LINEAR)?;
         let blend_alpha = make_blend_state(
             device,
             D3D11_BLEND_SRC_ALPHA,
@@ -162,7 +165,8 @@ impl SpriteBatch {
             D3D11_BLEND_INV_SRC_ALPHA,
         )?;
 
-        let white_tex = Texture2D::from_rgba8(device, &[255, 255, 255, 255], 1, 1)?;
+        let white_tex =
+            Texture2D::from_rgba8(device, &[255, 255, 255, 255], 1, 1, TextureFilter::Point)?;
 
         // Upload the initial projection matrix.
         upload_projection(context, &const_buf, render_width, render_height)?;
@@ -180,7 +184,9 @@ impl SpriteBatch {
             vertex_shader,
             pixel_shader,
             input_layout,
-            sampler,
+            sampler_point,
+            sampler_bilinear,
+            current_filter: TextureFilter::Point,
             blend_alpha,
             blend_additive,
             blend_multiplied,
@@ -215,7 +221,7 @@ impl SpriteBatch {
             ctx.VSSetShader(Some(&self.vertex_shader), None);
             ctx.VSSetConstantBuffers(0, Some(&[Some(self.const_buf.clone())]));
             ctx.PSSetShader(Some(&self.pixel_shader), None);
-            ctx.PSSetSamplers(0, Some(&[Some(self.sampler.clone())]));
+            ctx.PSSetSamplers(0, Some(&[Some(self.sampler_point.clone())]));
             ctx.OMSetBlendState(Some(self.active_blend_state()), None, 0xFFFF_FFFF);
         }
     }
@@ -273,6 +279,13 @@ impl SpriteBatch {
             BlendMode::Multiplied => &self.blend_multiplied,
         }
     }
+
+    fn active_sampler(&self) -> &ID3D11SamplerState {
+        match self.current_filter {
+            TextureFilter::Point => &self.sampler_point,
+            TextureFilter::Bilinear => &self.sampler_bilinear,
+        }
+    }
 }
 
 // ── Public draw interface (called from Frame) ─────────────────────────────────
@@ -285,6 +298,7 @@ impl SpriteBatch {
         srv: &ID3D11ShaderResourceView,
         tex_w: u32,
         tex_h: u32,
+        filter: TextureFilter,
         params: &DrawParams,
     ) {
         // Compute normalised UV rect from source_rect (or full texture).
@@ -304,6 +318,7 @@ impl SpriteBatch {
             uv,
             params.rotation,
             params.origin,
+            filter,
             params.tint,
         );
     }
@@ -317,6 +332,7 @@ impl SpriteBatch {
             Rect::new(0.0, 0.0, 1.0, 1.0),
             0.0,
             Vec2::ZERO,
+            TextureFilter::Point,
             colour,
         );
     }
@@ -334,6 +350,7 @@ impl SpriteBatch {
             Rect::new(0.0, 0.0, 1.0, 1.0),
             rotation,
             origin,
+            TextureFilter::Point,
             colour,
         );
     }
@@ -367,6 +384,7 @@ impl SpriteBatch {
             Rect::new(0.0, 0.0, 1.0, 1.0),
             angle,
             origin,
+            TextureFilter::Point,
             colour,
         );
     }
@@ -391,6 +409,7 @@ impl SpriteBatch {
                 Rect::new(0.0, 0.0, 1.0, 1.0),
                 angle_mid + std::f32::consts::FRAC_PI_2,
                 origin,
+                TextureFilter::Point,
                 colour,
             );
         }
@@ -467,7 +486,8 @@ impl SpriteBatch {
 // ── Internal batch machinery ──────────────────────────────────────────────────
 
 impl SpriteBatch {
-    /// Push one quad into the batch, flushing first if needed (texture changed or full).
+    /// Push one quad into the batch, flushing first if needed (texture/filter changed or full).
+    #[allow(clippy::too_many_arguments)]
     fn push_quad(
         &mut self,
         srv: &ID3D11ShaderResourceView,
@@ -475,18 +495,27 @@ impl SpriteBatch {
         uv: Rect,
         rotation: f32,
         origin: Vec2,
+        filter: TextureFilter,
         colour: Colour,
     ) {
-        // Flush if texture changes or batch is full.
+        // Flush if texture or filter changes, or batch is full.
         let texture_changed = self
             .current_srv
             .as_ref()
             .map(|c| c.as_raw() != srv.as_raw())
             .unwrap_or(true);
+        let filter_changed = self.current_filter != filter;
 
-        if texture_changed {
+        if texture_changed || filter_changed {
             self.flush();
             self.current_srv = Some(srv.clone());
+            if filter_changed {
+                self.current_filter = filter;
+                unsafe {
+                    self.context
+                        .PSSetSamplers(0, Some(&[Some(self.active_sampler().clone())]));
+                }
+            }
         } else if self.quad_count >= self.max_quads {
             self.flush();
         }
@@ -776,10 +805,12 @@ fn create_pixel_shader(device: &ID3D11Device, bytecode: &[u8]) -> Result<ID3D11P
     Ok(ps.unwrap())
 }
 
-fn create_sampler(device: &ID3D11Device) -> Result<ID3D11SamplerState, Error> {
-    // Point (nearest-neighbour) sampling — correct for pixel art.
+fn create_sampler(
+    device: &ID3D11Device,
+    filter: windows::Win32::Graphics::Direct3D11::D3D11_FILTER,
+) -> Result<ID3D11SamplerState, Error> {
     let desc = D3D11_SAMPLER_DESC {
-        Filter: D3D11_FILTER_MIN_MAG_MIP_POINT,
+        Filter: filter,
         AddressU: D3D11_TEXTURE_ADDRESS_CLAMP,
         AddressV: D3D11_TEXTURE_ADDRESS_CLAMP,
         AddressW: D3D11_TEXTURE_ADDRESS_CLAMP,

@@ -12,7 +12,7 @@ pub use audio::{Music, Sound, SoundParams};
 pub use colour::Colour;
 pub use error::Error;
 pub use frame::Frame;
-pub use graphics::{BlendMode, Camera2D, DrawParams, Font, RenderTarget, Texture2D};
+pub use graphics::{BlendMode, Camera2D, DrawParams, Font, RenderTarget, Texture2D, TextureFilter};
 pub use input::{GamepadBackend, GamepadButton, GamepadState, KeyCode, MouseButton};
 pub use maths::{Rect, Vec2};
 

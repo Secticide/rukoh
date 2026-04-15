@@ -192,7 +192,13 @@ fn build_font_atlas(
         }
     }
 
-    let atlas = Texture2D::from_rgba8(rukoh.d3d_device(), &atlas_pixels, atlas_w, atlas_h)?;
+    let atlas = Texture2D::from_rgba8(
+        rukoh.d3d_device(),
+        &atlas_pixels,
+        atlas_w,
+        atlas_h,
+        crate::graphics::texture::TextureFilter::Point,
+    )?;
     Ok(Font {
         glyphs,
         atlas,
@@ -235,6 +241,7 @@ impl Font {
                     &self.atlas.srv,
                     self.atlas.width,
                     self.atlas.height,
+                    self.atlas.filter,
                     &params,
                 );
             }

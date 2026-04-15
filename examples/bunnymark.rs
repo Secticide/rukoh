@@ -5,7 +5,10 @@
 //! Press Escape to quit.
 //!
 //! Place the sprite at: examples/assets/bunny.png
-use rukoh::{graphics::Texture2D, Colour, Font, KeyCode, MouseButton, Rukoh, RukohConfig, Vec2};
+use rukoh::{
+    graphics::Texture2D, Colour, Font, KeyCode, MouseButton, Rukoh, RukohConfig, TextureFilter,
+    Vec2,
+};
 
 const GRAVITY: f32 = 1_500.0;
 const DAMPING: f32 = 0.85; // velocity retained on floor bounce
@@ -27,7 +30,11 @@ fn main() -> Result<(), rukoh::Error> {
 
     // ── Assets ────────────────────────────────────────────────────────────────
 
-    let bunny = Texture2D::load(&app, include_bytes!("assets/bunny.png"))?;
+    let bunny = Texture2D::load(
+        &app,
+        include_bytes!("assets/bunny.png"),
+        TextureFilter::Point,
+    )?;
     let bw = bunny.width as f32;
     let bh = bunny.height as f32;
 

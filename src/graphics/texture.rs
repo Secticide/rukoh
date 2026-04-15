@@ -10,11 +10,26 @@ use windows::Win32::Graphics::{
 
 use crate::{Error, Rukoh};
 
+/// Controls how a texture is sampled when drawn at non-native sizes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum TextureFilter {
+    /// Nearest-neighbour (point) sampling. Sharp pixel edges.
+    ///
+    /// Best for pixel art and low-resolution rendering. This is the default.
+    #[default]
+    Point,
+    /// Bilinear filtering. Smooth interpolation between pixels.
+    ///
+    /// Best for smooth UI textures, gradients, and scaled photography.
+    Bilinear,
+}
+
 /// A GPU texture loaded from image data.
 ///
 /// Created via [`Texture2D::load`]. Freed when dropped.
 pub struct Texture2D {
     pub(crate) srv: ID3D11ShaderResourceView,
+    pub(crate) filter: TextureFilter,
     pub width: u32,
     pub height: u32,
 }
@@ -22,8 +37,9 @@ pub struct Texture2D {
 impl Texture2D {
     /// Load a texture from embedded bytes (use `include_bytes!`).
     ///
-    /// Supports PNG, JPEG, BMP, and TGA.
-    pub fn load(rukoh: &Rukoh, bytes: &[u8]) -> Result<Self, Error> {
+    /// Supports PNG, JPEG, BMP, and TGA. Pass [`TextureFilter::Bilinear`] for
+    /// smooth scaling, or [`TextureFilter::Point`] (the default) for sharp pixels.
+    pub fn load(rukoh: &Rukoh, bytes: &[u8], filter: TextureFilter) -> Result<Self, Error> {
         let device = rukoh.d3d_device();
 
         // ALLOCATION: decoded image pixel buffer — one Vec<u8> allocated by the `image` crate
@@ -35,15 +51,21 @@ impl Texture2D {
             .into_rgba8();
         let (w, h) = img.dimensions();
 
-        Self::from_rgba8(device, img.as_raw(), w, h)
+        Self::from_rgba8(device, img.as_raw(), w, h, filter)
     }
 
     /// Create a texture directly from raw RGBA8 pixel data.
     ///
     /// Useful for procedurally-generated textures. Each pixel is four bytes:
     /// `[R, G, B, A]`.
-    pub fn from_pixels(rukoh: &crate::Rukoh, pixels: &[u8], w: u32, h: u32) -> Result<Self, Error> {
-        Self::from_rgba8(rukoh.d3d_device(), pixels, w, h)
+    pub fn from_pixels(
+        rukoh: &crate::Rukoh,
+        pixels: &[u8],
+        w: u32,
+        h: u32,
+        filter: TextureFilter,
+    ) -> Result<Self, Error> {
+        Self::from_rgba8(rukoh.d3d_device(), pixels, w, h, filter)
     }
 
     pub(crate) fn from_rgba8(
@@ -51,6 +73,7 @@ impl Texture2D {
         pixels: &[u8],
         w: u32,
         h: u32,
+        filter: TextureFilter,
     ) -> Result<Self, Error> {
         let desc = D3D11_TEXTURE2D_DESC {
             Width: w,
@@ -94,6 +117,7 @@ impl Texture2D {
 
         Ok(Self {
             srv,
+            filter,
             width: w,
             height: h,
         })

@@ -98,6 +98,7 @@ fn build_srv(
 
     Ok(Texture2D {
         srv: srv.unwrap(),
+        filter: super::texture::TextureFilter::Point,
         width,
         height,
     })
