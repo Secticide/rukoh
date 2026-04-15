@@ -222,6 +222,13 @@ impl<'a> Frame<'a> {
         self.rukoh.input.keys_current[vk] && !self.rukoh.input.keys_prev[vk]
     }
 
+    /// The first key that transitioned to pressed this frame, or `None` if no
+    /// key was pressed. Useful for rebind screens and "press any key" prompts.
+    #[inline]
+    pub fn last_key_pressed(&self) -> Option<KeyCode> {
+        self.rukoh.input.last_key_pressed
+    }
+
     /// `true` on the first frame after the key is released (falling edge).
     #[inline]
     pub fn is_key_released(&self, key: KeyCode) -> bool {

@@ -187,6 +187,14 @@ impl Rukoh {
             .keys_current
             .copy_from_slice(&self.window.state.keys);
 
+        self.input.last_key_pressed = (0..256).find_map(|vk| {
+            if self.input.keys_current[vk] && !self.input.keys_prev[vk] {
+                input::keyboard::KeyCode::from_vk(vk)
+            } else {
+                None
+            }
+        });
+
         // ── 4. Sync mouse ─────────────────────────────────────────────────────
         // Map window client coords → render-space coords.
         let render_x = self.window.state.mouse_x as f32 * self.render_width as f32

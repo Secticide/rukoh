@@ -23,6 +23,8 @@ pub(crate) struct InputState {
     // ── Keyboard ─────────────────────────────────────────────────────────────
     pub keys_current: [bool; 256],
     pub keys_prev: [bool; 256],
+    /// The first key that transitioned to pressed this frame, or `None`.
+    pub last_key_pressed: Option<KeyCode>,
 
     // ── Mouse (render-space) ─────────────────────────────────────────────────
     pub mouse_pos: Vec2,
@@ -41,6 +43,7 @@ impl Default for InputState {
         Self {
             keys_current: [false; 256],
             keys_prev: [false; 256],
+            last_key_pressed: None,
             mouse_pos: Vec2::ZERO,
             mouse_delta: Vec2::ZERO,
             mouse_prev_pos: Vec2::ZERO,

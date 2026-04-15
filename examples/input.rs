@@ -92,6 +92,13 @@ fn main() -> Result<(), rukoh::Error> {
         };
         let cursor_colour = if cursor_visible { lit } else { dim };
         frame.draw_text(&font, cursor_label, Vec2::new(col_left, y), cursor_colour);
+        y += lh + 8.0;
+
+        let last_key_str = match frame.last_key_pressed() {
+            Some(key) => format!("Last pressed: {key:?}"),
+            None => "Last pressed: —".to_string(),
+        };
+        frame.draw_text(&font, &last_key_str, Vec2::new(col_left, y), lit);
 
         // ── Section: Mouse ────────────────────────────────────────────────────
         let mut y = 20.0_f32;
