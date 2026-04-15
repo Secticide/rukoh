@@ -1,10 +1,11 @@
 pub mod gamepad;
+pub(crate) mod hid;
 pub mod keyboard;
 
-pub use gamepad::{GamepadButton, GamepadState};
+pub use gamepad::{GamepadBackend, GamepadButton, GamepadState};
 pub use keyboard::KeyCode;
 
-use crate::math::Vec2;
+use crate::maths::Vec2;
 
 /// Mouse button identifier.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

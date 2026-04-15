@@ -7,5 +7,6 @@
       "Bash(cargo run:*)",
       "Bash(kill %1)"
     ]
-  }
+  },
+  "spinnerTipsEnabled": true
 }

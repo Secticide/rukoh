@@ -5,7 +5,7 @@ mod frame;
 mod gfx;
 pub mod graphics;
 pub mod input;
-mod math;
+mod maths;
 mod window;
 
 pub use audio::{Music, Sound, SoundParams};
@@ -13,15 +13,15 @@ pub use colour::Colour;
 pub use error::Error;
 pub use frame::Frame;
 pub use graphics::{Camera2D, DrawParams, Font, RenderTarget, Texture2D};
-pub use input::{GamepadButton, GamepadState, KeyCode, MouseButton};
-pub use math::{Rect, Vec2};
+pub use input::{GamepadBackend, GamepadButton, GamepadState, KeyCode, MouseButton};
+pub use maths::{Rect, Vec2};
 
 use windows::Win32::Graphics::Direct3D11::ID3D11RenderTargetView;
 
 use audio::AudioDevice;
 use gfx::GfxDevice;
 use graphics::renderer::SpriteBatch;
-use input::{gamepad::poll_gamepad, InputState};
+use input::{gamepad::poll_gamepad, hid::HidManager, InputState};
 use window::{client_size, Win32Window};
 
 use windows::Win32::{
@@ -94,6 +94,7 @@ pub struct Rukoh {
     pub(crate) audio: AudioDevice,
     window: Win32Window,
     input: InputState,
+    hid: HidManager,
     vsync: bool,
     pub(crate) render_width: u32,
     pub(crate) render_height: u32,
@@ -131,12 +132,16 @@ impl Rukoh {
         )?;
         let audio = AudioDevice::new(config.sound_voices)?;
 
+        let mut hid = HidManager::new();
+        hid.enumerate();
+
         Ok(Self {
             batch,
             gfx,
             audio,
             window,
             input: InputState::default(),
+            hid,
             vsync: config.vsync,
             render_width,
             render_height,
@@ -201,7 +206,17 @@ impl Rukoh {
         self.window.state.mouse_scroll_accum = 0.0;
 
         // ── 5. Poll gamepad ───────────────────────────────────────────────────
-        self.input.gamepad = poll_gamepad(prev_gamepad_buttons);
+        // Re-enumerate HID devices when the OS signals a connect/disconnect.
+        if self.window.state.devices_changed {
+            self.window.state.devices_changed = false;
+            self.hid.enumerate();
+        }
+
+        // XInput wins; HID is the fallback for non-XInput controllers.
+        self.input.gamepad = poll_gamepad(prev_gamepad_buttons)
+            .or_else(|| self.hid.process_reports(&mut self.window.state.hid_reports));
+        // Always drain buffered HID reports (even when XInput won this frame).
+        self.window.state.hid_reports.clear();
 
         // ── 6. Delta time ─────────────────────────────────────────────────────
         let mut now: i64 = 0;

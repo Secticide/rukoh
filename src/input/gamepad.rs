@@ -1,9 +1,20 @@
 use windows::Win32::UI::Input::XboxController::{XInputGetState, XINPUT_STATE};
 
-use crate::math::Vec2;
+use crate::maths::Vec2;
 
 /// Radial dead zone applied to both analogue sticks.
 const STICK_DEADZONE: f32 = 0.24;
+
+/// The driver backend used to read the connected gamepad.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum GamepadBackend {
+    /// Xbox-compatible controller read via XInput.
+    #[default]
+    XInput,
+    /// Non-XInput controller (e.g. DualShock 4, DualSense, Switch Pro) read
+    /// via the Raw Input / HID API.
+    Hid,
+}
 
 /// A gamepad button, named by position (hardware-agnostic).
 ///
@@ -32,7 +43,7 @@ pub enum GamepadButton {
 }
 
 impl GamepadButton {
-    fn xinput_mask(self) -> u16 {
+    pub(crate) fn xinput_mask(self) -> u16 {
         match self {
             Self::DpadUp => 0x0001,
             Self::DpadDown => 0x0002,
@@ -60,10 +71,11 @@ impl GamepadButton {
 pub struct GamepadState {
     pub(crate) buttons_current: u16,
     pub(crate) buttons_prev: u16,
-    left_stick: Vec2,
-    right_stick: Vec2,
-    left_trigger: f32,
-    right_trigger: f32,
+    pub(crate) left_stick: Vec2,
+    pub(crate) right_stick: Vec2,
+    pub(crate) left_trigger: f32,
+    pub(crate) right_trigger: f32,
+    pub(crate) backend: GamepadBackend,
 }
 
 impl GamepadState {
@@ -110,6 +122,12 @@ impl GamepadState {
     pub fn right_trigger(&self) -> f32 {
         self.right_trigger
     }
+
+    /// The driver backend used to read this controller.
+    #[inline]
+    pub fn backend(self) -> GamepadBackend {
+        self.backend
+    }
 }
 
 /// Poll XInput slot 0. Returns `None` if no controller is connected.
@@ -133,6 +151,7 @@ pub(crate) fn poll_gamepad(prev_buttons: u16) -> Option<GamepadState> {
         right_stick: normalise_stick(gp.sThumbRX, gp.sThumbRY),
         left_trigger: gp.bLeftTrigger as f32 / 255.0,
         right_trigger: gp.bRightTrigger as f32 / 255.0,
+        backend: GamepadBackend::XInput,
     })
 }
 

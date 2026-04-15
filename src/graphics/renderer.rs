@@ -361,23 +361,39 @@ impl SpriteBatch {
             let y0 = dest.y;
             let x1 = dest.x + dest.w;
             let y1 = dest.y + dest.h;
-            self.vertices.push(Vertex { pos: [x0, y0], uv: [uv.x,        uv.y       ], colour: col });
-            self.vertices.push(Vertex { pos: [x1, y0], uv: [uv.x + uv.w, uv.y       ], colour: col });
-            self.vertices.push(Vertex { pos: [x1, y1], uv: [uv.x + uv.w, uv.y + uv.h], colour: col });
-            self.vertices.push(Vertex { pos: [x0, y1], uv: [uv.x,        uv.y + uv.h], colour: col });
+            self.vertices.push(Vertex {
+                pos: [x0, y0],
+                uv: [uv.x, uv.y],
+                colour: col,
+            });
+            self.vertices.push(Vertex {
+                pos: [x1, y0],
+                uv: [uv.x + uv.w, uv.y],
+                colour: col,
+            });
+            self.vertices.push(Vertex {
+                pos: [x1, y1],
+                uv: [uv.x + uv.w, uv.y + uv.h],
+                colour: col,
+            });
+            self.vertices.push(Vertex {
+                pos: [x0, y1],
+                uv: [uv.x, uv.y + uv.h],
+                colour: col,
+            });
         } else {
             // General path: rotate each corner around the pivot point.
             let corners_local = [
-                Vec2::new(-origin.x,          -origin.y         ),
-                Vec2::new(dest.w - origin.x,  -origin.y         ),
-                Vec2::new(dest.w - origin.x,   dest.h - origin.y),
-                Vec2::new(-origin.x,           dest.h - origin.y),
+                Vec2::new(-origin.x, -origin.y),
+                Vec2::new(dest.w - origin.x, -origin.y),
+                Vec2::new(dest.w - origin.x, dest.h - origin.y),
+                Vec2::new(-origin.x, dest.h - origin.y),
             ];
             let uvs = [
-                Vec2::new(uv.x,        uv.y       ),
-                Vec2::new(uv.x + uv.w, uv.y       ),
+                Vec2::new(uv.x, uv.y),
+                Vec2::new(uv.x + uv.w, uv.y),
                 Vec2::new(uv.x + uv.w, uv.y + uv.h),
-                Vec2::new(uv.x,        uv.y + uv.h),
+                Vec2::new(uv.x, uv.y + uv.h),
             ];
             let (sin, cos) = rotation.sin_cos();
             let pivot_world = Vec2::new(dest.x + origin.x, dest.y + origin.y);

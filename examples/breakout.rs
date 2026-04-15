@@ -451,8 +451,8 @@ fn main() -> Result<(), rukoh::Error> {
     let font_lg = Font::load(&app, &font_bytes, 42.0)?;
 
     // Audio.
-    let impact_bytes = std::fs::read("examples/assets/impact.ogg")
-        .expect("Place impact.ogg in examples/assets/");
+    let impact_bytes =
+        std::fs::read("examples/assets/impact.ogg").expect("Place impact.ogg in examples/assets/");
     let music_bytes =
         std::fs::read("examples/assets/music.ogg").expect("Place music.ogg in examples/assets/");
     let impact = Sound::load(&app, &impact_bytes)?;

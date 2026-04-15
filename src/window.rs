@@ -3,14 +3,21 @@ use windows::{
     Win32::{
         Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM},
         System::LibraryLoader::GetModuleHandleW,
-        UI::WindowsAndMessaging::{
-            AdjustWindowRect, CreateWindowExW, DefWindowProcW, DestroyWindow, GetSystemMetrics,
-            GetWindowLongPtrW, LoadCursorW, RegisterClassExW, SetWindowLongPtrW, CREATESTRUCTW,
-            CS_HREDRAW, CS_VREDRAW, GWLP_USERDATA, IDC_ARROW, SM_CXSCREEN, SM_CYSCREEN,
-            WINDOW_EX_STYLE, WINDOW_STYLE, WM_CLOSE, WM_KEYDOWN, WM_KEYUP, WM_LBUTTONDOWN,
-            WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_NCCREATE,
-            WM_RBUTTONDOWN, WM_RBUTTONUP, WM_SYSKEYDOWN, WM_SYSKEYUP, WNDCLASSEXW, WS_CAPTION,
-            WS_MINIMIZEBOX, WS_OVERLAPPED, WS_POPUP, WS_SYSMENU, WS_VISIBLE,
+        UI::{
+            Input::{
+                GetRawInputData, RegisterRawInputDevices, HRAWINPUT, RAWINPUT, RAWINPUTDEVICE,
+                RAWINPUTHEADER, RIDEV_DEVNOTIFY, RID_INPUT, RIM_TYPEHID,
+            },
+            WindowsAndMessaging::{
+                AdjustWindowRect, CreateWindowExW, DefWindowProcW, DestroyWindow, GetSystemMetrics,
+                GetWindowLongPtrW, LoadCursorW, RegisterClassExW, SetWindowLongPtrW, CREATESTRUCTW,
+                CS_HREDRAW, CS_VREDRAW, GWLP_USERDATA, IDC_ARROW, SM_CXSCREEN, SM_CYSCREEN,
+                WINDOW_EX_STYLE, WINDOW_STYLE, WM_CLOSE, WM_INPUT, WM_INPUT_DEVICE_CHANGE,
+                WM_KEYDOWN, WM_KEYUP, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP,
+                WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_NCCREATE, WM_RBUTTONDOWN, WM_RBUTTONUP,
+                WM_SYSKEYDOWN, WM_SYSKEYUP, WNDCLASSEXW, WS_CAPTION, WS_MINIMIZEBOX, WS_OVERLAPPED,
+                WS_POPUP, WS_SYSMENU, WS_VISIBLE,
+            },
         },
     },
 };
@@ -36,6 +43,12 @@ pub struct WindowState {
     pub mouse_buttons: [bool; 3],
     /// Accumulated scroll this frame. Reset by `next_frame` after it reads the value.
     pub mouse_scroll_accum: f32,
+
+    // ── HID gamepad ───────────────────────────────────────────────────────
+    /// Raw HID reports received via `WM_INPUT` this frame. Drained by `HidManager`.
+    pub hid_reports: Vec<crate::input::hid::HidReport>,
+    /// Set by `WM_INPUT_DEVICE_CHANGE`; triggers re-enumeration in `next_frame`.
+    pub devices_changed: bool,
 }
 
 impl Default for WindowState {
@@ -47,6 +60,8 @@ impl Default for WindowState {
             mouse_y: 0,
             mouse_buttons: [false; 3],
             mouse_scroll_accum: 0.0,
+            hid_reports: Vec::new(),
+            devices_changed: false,
         }
     }
 }
@@ -105,6 +120,28 @@ impl Win32Window {
                 Some(state_ptr.cast()),
             )?
         };
+
+        // Register for Raw Input from gamepads and joysticks. RIDEV_DEVNOTIFY
+        // causes WM_INPUT_DEVICE_CHANGE to be sent on connect/disconnect.
+        unsafe {
+            RegisterRawInputDevices(
+                &[
+                    RAWINPUTDEVICE {
+                        usUsagePage: 0x01,
+                        usUsage: 0x05, // Generic Desktop / Game Pad
+                        dwFlags: RIDEV_DEVNOTIFY,
+                        hwndTarget: hwnd,
+                    },
+                    RAWINPUTDEVICE {
+                        usUsagePage: 0x01,
+                        usUsage: 0x04, // Generic Desktop / Joystick
+                        dwFlags: RIDEV_DEVNOTIFY,
+                        hwndTarget: hwnd,
+                    },
+                ],
+                std::mem::size_of::<RAWINPUTDEVICE>() as u32,
+            )?;
+        }
 
         Ok(Self { hwnd, state })
     }
@@ -241,6 +278,47 @@ unsafe extern "system" fn window_proc(
             let delta = ((wparam.0 >> 16) as i16) as f32 / 120.0;
             state.mouse_scroll_accum += delta;
             LRESULT(0)
+        }
+
+        // ── HID gamepad raw input ─────────────────────────────────────────────
+        WM_INPUT => {
+            let header_size = std::mem::size_of::<RAWINPUTHEADER>() as u32;
+            let mut size: u32 = 0;
+            // HRAWINPUT wraps *mut c_void; lparam carries the handle as isize.
+            let hrawinput = HRAWINPUT(lparam.0 as *mut _);
+            GetRawInputData(hrawinput, RID_INPUT, None, &mut size, header_size);
+            if size > 0 {
+                // Allocate with u64 alignment to satisfy RAWINPUT alignment requirements.
+                let word_count = size as usize / 8 + 1;
+                let mut buf = vec![0u64; word_count];
+                let byte_ptr = buf.as_mut_ptr() as *mut _;
+                let written =
+                    GetRawInputData(hrawinput, RID_INPUT, Some(byte_ptr), &mut size, header_size);
+                if written != u32::MAX {
+                    let raw = &*(buf.as_ptr() as *const RAWINPUT);
+                    if raw.header.dwType == RIM_TYPEHID.0 {
+                        let hid = &raw.data.hid;
+                        let report_size = hid.dwSizeHid as usize;
+                        let count = hid.dwCount as usize;
+                        let base = hid.bRawData.as_ptr();
+                        for i in 0..count {
+                            let ptr = base.add(i * report_size);
+                            let data = std::slice::from_raw_parts(ptr, report_size).to_vec();
+                            // HANDLE.0 is *mut c_void; cast to isize for storage.
+                            state.hid_reports.push(crate::input::hid::HidReport {
+                                device: raw.header.hDevice.0 as isize,
+                                data,
+                            });
+                        }
+                    }
+                }
+            }
+            DefWindowProcW(hwnd, msg, wparam, lparam)
+        }
+
+        WM_INPUT_DEVICE_CHANGE => {
+            state.devices_changed = true;
+            DefWindowProcW(hwnd, msg, wparam, lparam)
         }
 
         _ => DefWindowProcW(hwnd, msg, wparam, lparam),

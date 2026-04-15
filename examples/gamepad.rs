@@ -1,12 +1,11 @@
 use rukoh::{
-    Colour, Font, Frame, GamepadButton, GamepadState, KeyCode, Rect, Rukoh, RukohConfig, Vec2,
-    WindowMode,
+    Colour, Font, Frame, GamepadBackend, GamepadButton, GamepadState, KeyCode, Rect, Rukoh,
+    RukohConfig, Vec2, WindowMode,
 };
 
 // ── Colour palette ────────────────────────────────────────────────────────────
 
 const COL_BG: Colour = Colour::new(0.08, 0.08, 0.08, 1.0);
-const COL_BODY: Colour = Colour::new(0.18, 0.18, 0.18, 1.0);
 const COL_BODY_EDGE: Colour = Colour::new(0.12, 0.12, 0.12, 1.0);
 const COL_BTN_OFF: Colour = Colour::new(0.32, 0.32, 0.32, 1.0);
 const COL_STICK_RING_OFF: Colour = Colour::new(0.28, 0.28, 0.28, 1.0);
@@ -74,7 +73,7 @@ fn main() -> Result<(), rukoh::Error> {
             );
             frame.draw_text(
                 &font_sm,
-                "Connect an Xbox-compatible gamepad and press any button",
+                "Connect a gamepad and press any button",
                 Vec2::new(190.0, 308.0),
                 COL_TEXT_DIM,
             );
@@ -100,20 +99,6 @@ fn draw_controller(frame: &mut Frame<'_>, font: &Font, font_sm: &Font, gp: Optio
     let rt = gp.map(|g| g.right_trigger()).unwrap_or(0.0);
     let ls = gp.map(|g| g.left_stick()).unwrap_or(Vec2::ZERO);
     let rs = gp.map(|g| g.right_stick()).unwrap_or(Vec2::ZERO);
-
-    // ── Body silhouette ───────────────────────────────────────────────────────
-
-    // Main torso.
-    frame.draw_rect(Rect::new(157.0, 197.0, 486.0, 186.0), COL_BODY_EDGE);
-    frame.draw_rect(Rect::new(161.0, 201.0, 478.0, 178.0), COL_BODY);
-
-    // Left grip.
-    frame.draw_rect(Rect::new(157.0, 359.0, 162.0, 132.0), COL_BODY_EDGE);
-    frame.draw_rect(Rect::new(161.0, 363.0, 154.0, 124.0), COL_BODY);
-
-    // Right grip.
-    frame.draw_rect(Rect::new(481.0, 359.0, 162.0, 132.0), COL_BODY_EDGE);
-    frame.draw_rect(Rect::new(485.0, 363.0, 154.0, 124.0), COL_BODY);
 
     // ── Triggers (LT / RT) ────────────────────────────────────────────────────
 
@@ -149,25 +134,22 @@ fn draw_controller(frame: &mut Frame<'_>, font: &Font, font_sm: &Font, gp: Optio
 
     draw_stick(
         frame,
-        Vec2::new(268.0, 312.0),
+        Vec2::new(340.0, 382.0),
         ls,
         btn(GamepadButton::LeftThumb),
     );
     draw_stick(
         frame,
-        Vec2::new(462.0, 382.0),
+        Vec2::new(460.0, 382.0),
         rs,
         btn(GamepadButton::RightThumb),
     );
-
-    frame.draw_text(font_sm, "LS", Vec2::new(254.0, 352.0), COL_TEXT_LABEL);
-    frame.draw_text(font_sm, "RS", Vec2::new(448.0, 422.0), COL_TEXT_LABEL);
 
     // ── D-pad ─────────────────────────────────────────────────────────────────
 
     draw_dpad(
         frame,
-        Vec2::new(207.0, 393.0),
+        Vec2::new(230.0, 282.0),
         btn(GamepadButton::DpadUp),
         btn(GamepadButton::DpadDown),
         btn(GamepadButton::DpadLeft),
@@ -176,10 +158,12 @@ fn draw_controller(frame: &mut Frame<'_>, font: &Font, font_sm: &Font, gp: Optio
 
     // ── Face buttons (ABXY) ───────────────────────────────────────────────────
 
+    let face_centre = Vec2::new(560.0, 282.0);
+    let face_offset = Vec2::new(32.0, 32.0);
     draw_face_btn(
         frame,
         font_sm,
-        Vec2::new(548.0, 352.0),
+        face_centre + Vec2::new(0.0, face_offset.y),
         btn(GamepadButton::South),
         COL_A,
         "A",
@@ -187,7 +171,7 @@ fn draw_controller(frame: &mut Frame<'_>, font: &Font, font_sm: &Font, gp: Optio
     draw_face_btn(
         frame,
         font_sm,
-        Vec2::new(582.0, 320.0),
+        face_centre + Vec2::new(face_offset.x, 0.0),
         btn(GamepadButton::East),
         COL_B,
         "B",
@@ -195,7 +179,7 @@ fn draw_controller(frame: &mut Frame<'_>, font: &Font, font_sm: &Font, gp: Optio
     draw_face_btn(
         frame,
         font_sm,
-        Vec2::new(514.0, 320.0),
+        face_centre - Vec2::new(face_offset.x, 0.0),
         btn(GamepadButton::West),
         COL_X,
         "X",
@@ -203,7 +187,7 @@ fn draw_controller(frame: &mut Frame<'_>, font: &Font, font_sm: &Font, gp: Optio
     draw_face_btn(
         frame,
         font_sm,
-        Vec2::new(548.0, 288.0),
+        face_centre - Vec2::new(0.0, face_offset.y),
         btn(GamepadButton::North),
         COL_Y,
         "Y",
@@ -214,15 +198,22 @@ fn draw_controller(frame: &mut Frame<'_>, font: &Font, font_sm: &Font, gp: Optio
     draw_menu_btn(frame, Vec2::new(348.0, 282.0), btn(GamepadButton::Back));
     draw_menu_btn(frame, Vec2::new(452.0, 282.0), btn(GamepadButton::Start));
 
-    frame.draw_text(font_sm, "Back", Vec2::new(328.0, 265.0), COL_TEXT_LABEL);
-    frame.draw_text(font_sm, "Start", Vec2::new(432.0, 265.0), COL_TEXT_LABEL);
+    frame.draw_text(font_sm, "Back", Vec2::new(335.0, 255.0), COL_TEXT_LABEL);
+    frame.draw_text(font_sm, "Start", Vec2::new(439.0, 255.0), COL_TEXT_LABEL);
 
     // ── Raw value readout ─────────────────────────────────────────────────────
+
+    let backend_str = match gp.map(|g| g.backend()) {
+        Some(GamepadBackend::XInput) => "Backend: XInput",
+        Some(GamepadBackend::Hid) => "Backend: HID",
+        None => "",
+    };
+    frame.draw_text(font, backend_str, Vec2::new(30.0, 468.0), COL_TEXT_DIM);
 
     frame.draw_text(
         font,
         "Analogue values",
-        Vec2::new(30.0, 468.0),
+        Vec2::new(30.0, 488.0),
         COL_TEXT_DIM,
     );
 
@@ -230,9 +221,9 @@ fn draw_controller(frame: &mut Frame<'_>, font: &Font, font_sm: &Font, gp: Optio
     let rs_str = format!("RS  x: {:+.3}   y: {:+.3}", rs.x, rs.y);
     let tr_str = format!("LT  {:.3}          RT  {:.3}", lt, rt);
 
-    frame.draw_text(font_sm, &ls_str, Vec2::new(30.0, 492.0), COL_TEXT);
-    frame.draw_text(font_sm, &rs_str, Vec2::new(30.0, 510.0), COL_TEXT);
-    frame.draw_text(font_sm, &tr_str, Vec2::new(30.0, 528.0), COL_TEXT);
+    frame.draw_text(font_sm, &ls_str, Vec2::new(30.0, 512.0), COL_TEXT);
+    frame.draw_text(font_sm, &rs_str, Vec2::new(30.0, 530.0), COL_TEXT);
+    frame.draw_text(font_sm, &tr_str, Vec2::new(30.0, 548.0), COL_TEXT);
 }
 
 // ── Shape helpers ─────────────────────────────────────────────────────────────
