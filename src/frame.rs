@@ -99,6 +99,27 @@ impl<'a> Frame<'a> {
         self.rukoh.batch.draw_line(start, end, thickness, colour);
     }
 
+    /// Draw a filled triangle. Vertices should be in counter-clockwise order.
+    pub fn draw_triangle(&mut self, v1: Vec2, v2: Vec2, v3: Vec2, colour: Colour) {
+        self.rukoh.batch.draw_triangle(v1, v2, v3, colour);
+    }
+
+    /// Show the OS cursor. No-op if the cursor is already visible.
+    pub fn show_cursor(&mut self) {
+        if !self.rukoh.cursor_visible {
+            self.rukoh.cursor_visible = true;
+            unsafe { windows::Win32::UI::WindowsAndMessaging::ShowCursor(true) };
+        }
+    }
+
+    /// Hide the OS cursor. No-op if the cursor is already hidden.
+    pub fn hide_cursor(&mut self) {
+        if self.rukoh.cursor_visible {
+            self.rukoh.cursor_visible = false;
+            unsafe { windows::Win32::UI::WindowsAndMessaging::ShowCursor(false) };
+        }
+    }
+
     /// Draw a filled circle tessellated into 32 triangle segments.
     pub fn draw_circle(&mut self, centre: Vec2, radius: f32, colour: Colour) {
         self.rukoh.batch.draw_circle(centre, radius, colour);

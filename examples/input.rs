@@ -1,4 +1,6 @@
-use rukoh::{Colour, GamepadButton, KeyCode, MouseButton, Rukoh, RukohConfig, WindowMode};
+use rukoh::{
+    Colour, Font, GamepadButton, KeyCode, MouseButton, Rect, Rukoh, RukohConfig, Vec2, WindowMode,
+};
 
 fn main() -> Result<(), rukoh::Error> {
     let mut app = Rukoh::new(RukohConfig {
@@ -11,99 +13,192 @@ fn main() -> Result<(), rukoh::Error> {
         ..Default::default()
     })?;
 
-    println!("Click the window to focus it, then:");
-    println!("  - Press keys to see keyboard events");
-    println!("  - Move the mouse and click buttons");
-    println!("  - Plug in a gamepad to see stick/button values");
-    println!("  - Press Escape to quit");
+    let font = Font::load(&app, include_bytes!("assets/lexend.ttf"), 18.0)?;
+
+    let mut cursor_visible = true;
 
     while let Some(mut frame) = app.next_frame() {
         frame.clear(Colour::DARK_GREY);
 
-        // ── Keyboard ──────────────────────────────────────────────────────────
+        // ── Cursor toggle ─────────────────────────────────────────────────────
         if frame.is_key_pressed(KeyCode::Escape) {
-            println!("Escape pressed — exiting.");
             break;
         }
-        if frame.is_key_pressed(KeyCode::Space) {
-            println!("Space PRESSED");
-        }
-        if frame.is_key_released(KeyCode::Space) {
-            println!("Space RELEASED");
-        }
-
-        // Log any letter key presses (A-Z)
-        for (key, name) in [
-            (KeyCode::A, "A"),
-            (KeyCode::B, "B"),
-            (KeyCode::C, "C"),
-            (KeyCode::D, "D"),
-            (KeyCode::E, "E"),
-            (KeyCode::F, "F"),
-            (KeyCode::W, "W"),
-            (KeyCode::S, "S"),
-            (KeyCode::Left, "Left"),
-            (KeyCode::Right, "Right"),
-            (KeyCode::Up, "Up"),
-            (KeyCode::Down, "Down"),
-        ] {
-            if frame.is_key_pressed(key) {
-                println!("Key pressed:  {name}");
+        if frame.is_key_pressed(KeyCode::H) {
+            cursor_visible = !cursor_visible;
+            if cursor_visible {
+                frame.show_cursor();
+            } else {
+                frame.hide_cursor();
             }
         }
 
-        // ── Mouse ─────────────────────────────────────────────────────────────
+        let w = frame.width() as f32;
+        let h = frame.height() as f32;
+        let lh = font.line_height();
+        let dim = Colour::new(0.45, 0.45, 0.45, 1.0);
+        let lit = Colour::WHITE;
+        let active = Colour::new(0.3, 1.0, 0.4, 1.0); // green — key/button held
+        let col_left = 20.0_f32;
+        let col_right = w * 0.5 + 10.0;
+
+        // ── Helper: coloured key label ────────────────────────────────────────
+        // Drawn inline below — returns the colour based on held state.
+
+        // ── Section: Keyboard ─────────────────────────────────────────────────
+        let mut y = 20.0_f32;
+        frame.draw_text(&font, "KEYBOARD", Vec2::new(col_left, y), Colour::YELLOW);
+        y += lh + 6.0;
+
+        // Movement keys row
+        for (key, label) in [
+            (KeyCode::W, "W"),
+            (KeyCode::A, "A"),
+            (KeyCode::S, "S"),
+            (KeyCode::D, "D"),
+        ] {
+            frame.draw_text(&font, label, Vec2::new(col_left, y), Colour::WHITE);
+            let colour = if frame.is_key_down(key) { active } else { dim };
+            frame.draw_rect(
+                Rect::new(
+                    col_left + font.measure_text(label).x + 4.0,
+                    y + 2.0,
+                    10.0,
+                    lh - 4.0,
+                ),
+                colour,
+            );
+            y += lh + 2.0;
+        }
+
+        y += 4.0;
+        for (key, label) in [
+            (KeyCode::Up, "Up"),
+            (KeyCode::Down, "Down"),
+            (KeyCode::Left, "Left"),
+            (KeyCode::Right, "Right"),
+            (KeyCode::Space, "Space"),
+        ] {
+            let colour = if frame.is_key_down(key) { active } else { dim };
+            frame.draw_text(&font, label, Vec2::new(col_left, y), colour);
+            y += lh + 2.0;
+        }
+
+        y += 4.0;
+        let cursor_label = if cursor_visible {
+            "H — cursor: visible"
+        } else {
+            "H — cursor: hidden"
+        };
+        let cursor_colour = if cursor_visible { lit } else { dim };
+        frame.draw_text(&font, cursor_label, Vec2::new(col_left, y), cursor_colour);
+
+        // ── Section: Mouse ────────────────────────────────────────────────────
+        let mut y = 20.0_f32;
         let pos = frame.mouse_pos();
         let delta = frame.mouse_delta();
         let scroll = frame.mouse_scroll();
 
-        if delta.x.abs() > 0.5 || delta.y.abs() > 0.5 {
-            println!(
-                "Mouse  pos=({:.1}, {:.1})  delta=({:.1}, {:.1})",
-                pos.x, pos.y, delta.x, delta.y
-            );
-        }
-        if scroll.abs() > f32::EPSILON {
-            println!("Scroll  {scroll:.2}");
-        }
-        if frame.is_mouse_pressed(MouseButton::Left) {
-            println!("LMB pressed  at ({:.1}, {:.1})", pos.x, pos.y);
-        }
-        if frame.is_mouse_pressed(MouseButton::Right) {
-            println!("RMB pressed  at ({:.1}, {:.1})", pos.x, pos.y);
+        frame.draw_text(&font, "MOUSE", Vec2::new(col_right, y), Colour::YELLOW);
+        y += lh + 6.0;
+
+        frame.draw_text(
+            &font,
+            &format!("Position  ({:.1}, {:.1})", pos.x, pos.y),
+            Vec2::new(col_right, y),
+            lit,
+        );
+        y += lh + 2.0;
+        frame.draw_text(
+            &font,
+            &format!("Delta     ({:.1}, {:.1})", delta.x, delta.y),
+            Vec2::new(col_right, y),
+            lit,
+        );
+        y += lh + 2.0;
+        frame.draw_text(
+            &font,
+            &format!("Scroll    {scroll:.2}"),
+            Vec2::new(col_right, y),
+            lit,
+        );
+        y += lh + 8.0;
+
+        for (btn, label) in [
+            (MouseButton::Left, "LMB"),
+            (MouseButton::Right, "RMB"),
+            (MouseButton::Middle, "MMB"),
+        ] {
+            let colour = if frame.is_mouse_down(btn) {
+                active
+            } else {
+                dim
+            };
+            frame.draw_text(&font, label, Vec2::new(col_right, y), colour);
+            y += lh + 2.0;
         }
 
-        // ── Gamepad ───────────────────────────────────────────────────────────
+        // ── Section: Gamepad ──────────────────────────────────────────────────
+        let section_y = h * 0.5 + 10.0;
+        let mut y_l = section_y;
+        let mut y_r = section_y;
+
+        frame.draw_text(&font, "GAMEPAD", Vec2::new(col_left, y_l), Colour::YELLOW);
+        y_l += lh + 6.0;
+        frame.draw_text(&font, "GAMEPAD", Vec2::new(col_right, y_r), Colour::YELLOW);
+        y_r += lh + 6.0;
+
         if let Some(pad) = frame.gamepad() {
             let ls = pad.left_stick();
             let rs = pad.right_stick();
             let lt = pad.left_trigger();
             let rt = pad.right_trigger();
 
-            if ls.length_sq() > 0.01 || rs.length_sq() > 0.01 || lt > 0.05 || rt > 0.05 {
-                println!(
-                    "Gamepad  LS=({:.2},{:.2})  RS=({:.2},{:.2})  LT={lt:.2}  RT={rt:.2}",
-                    ls.x, ls.y, rs.x, rs.y
-                );
-            }
+            frame.draw_text(
+                &font,
+                &format!("LS  ({:+.2}, {:+.2})", ls.x, ls.y),
+                Vec2::new(col_left, y_l),
+                lit,
+            );
+            y_l += lh + 2.0;
+            frame.draw_text(
+                &font,
+                &format!("RS  ({:+.2}, {:+.2})", rs.x, rs.y),
+                Vec2::new(col_left, y_l),
+                lit,
+            );
+            y_l += lh + 2.0;
+            frame.draw_text(
+                &font,
+                &format!("LT  {lt:.2}   RT  {rt:.2}"),
+                Vec2::new(col_left, y_l),
+                lit,
+            );
 
-            for (btn, name) in [
-                (GamepadButton::South, "South (A/Cross)"),
-                (GamepadButton::East, "East  (B/Circle)"),
-                (GamepadButton::West, "West  (X/Square)"),
-                (GamepadButton::North, "North (Y/Triangle)"),
-                (GamepadButton::Start, "Start"),
-                (GamepadButton::Back, "Back"),
+            for (btn, label) in [
+                (GamepadButton::South, "A/Cross"),
+                (GamepadButton::East, "B/Circle"),
+                (GamepadButton::West, "X/Square"),
+                (GamepadButton::North, "Y/Triangle"),
                 (GamepadButton::LeftShoulder, "LB"),
                 (GamepadButton::RightShoulder, "RB"),
+                (GamepadButton::Start, "Start"),
+                (GamepadButton::Back, "Back"),
                 (GamepadButton::DpadUp, "DPad Up"),
                 (GamepadButton::DpadDown, "DPad Down"),
+                (GamepadButton::DpadLeft, "DPad Left"),
+                (GamepadButton::DpadRight, "DPad Right"),
             ] {
-                if pad.is_button_pressed(btn) {
-                    println!("Gamepad  {name} PRESSED");
-                }
+                let colour = if pad.is_button_down(btn) { active } else { dim };
+                frame.draw_text(&font, label, Vec2::new(col_right, y_r), colour);
+                y_r += lh + 2.0;
             }
+        } else {
+            frame.draw_text(&font, "No gamepad connected", Vec2::new(col_left, y_l), dim);
         }
+
+        // ── ESC hint ──────────────────────────────────────────────────────────
+        frame.draw_text(&font, "Esc — quit", Vec2::new(col_left, h - lh - 10.0), dim);
     }
 
     Ok(())

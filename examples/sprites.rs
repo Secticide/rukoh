@@ -122,6 +122,14 @@ fn main() -> Result<(), rukoh::Error> {
         frame.draw_rect_lines(Rect::new(10.0, 80.0, 120.0, 60.0), 3.0, Colour::GREEN);
         frame.draw_circle(Vec2::new(w * 0.5, h * 0.5), 45.0, Colour::YELLOW);
         frame.draw_circle_lines(Vec2::new(w * 0.5, h * 0.5), 62.0, 3.0, Colour::CYAN);
+
+        // Triangle — counter-clockwise, pointing up.
+        frame.draw_triangle(
+            Vec2::new(w - 60.0, h - 120.0),
+            Vec2::new(w - 110.0, h - 40.0),
+            Vec2::new(w - 10.0, h - 40.0),
+            Colour::GREEN,
+        );
         frame.draw_line(Vec2::new(0.0, h), Vec2::new(w, 0.0), 2.0, Colour::CYAN);
 
         // Rotated rectangle — pivots around its centre.

@@ -396,6 +396,31 @@ impl SpriteBatch {
         }
     }
 
+    /// Draw a filled triangle. Vertices should be in counter-clockwise order.
+    pub fn draw_triangle(&mut self, v1: Vec2, v2: Vec2, v3: Vec2, colour: Colour) {
+        self.flush();
+        let col = colour.to_array();
+        let verts = [
+            Vertex {
+                pos: [v1.x, v1.y],
+                uv: [0.5, 0.5],
+                colour: col,
+            },
+            Vertex {
+                pos: [v2.x, v2.y],
+                uv: [0.5, 0.5],
+                colour: col,
+            },
+            Vertex {
+                pos: [v3.x, v3.y],
+                uv: [0.5, 0.5],
+                colour: col,
+            },
+        ];
+        let white_srv = self.white_tex.srv.clone();
+        self.draw_triangles(&verts, &white_srv);
+    }
+
     /// Draw a filled circle tessellated into 32 triangle-list segments.
     pub fn draw_circle(&mut self, centre: Vec2, radius: f32, colour: Colour) {
         const SEGMENTS: usize = 32;

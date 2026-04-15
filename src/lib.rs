@@ -105,6 +105,7 @@ pub struct Rukoh {
     window_client_h: u32,
     qpc_freq: i64,
     last_frame_time: i64,
+    cursor_visible: bool,
 }
 
 impl Rukoh {
@@ -150,6 +151,7 @@ impl Rukoh {
             window_client_h,
             qpc_freq,
             last_frame_time: 0,
+            cursor_visible: true,
         })
     }
 
