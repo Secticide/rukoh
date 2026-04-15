@@ -43,6 +43,24 @@ pub enum GamepadButton {
 }
 
 impl GamepadButton {
+    /// All button variants in a fixed order, used for `last_button_pressed` iteration.
+    const ALL: [Self; 14] = [
+        Self::South,
+        Self::East,
+        Self::West,
+        Self::North,
+        Self::LeftShoulder,
+        Self::RightShoulder,
+        Self::LeftThumb,
+        Self::RightThumb,
+        Self::Start,
+        Self::Back,
+        Self::DpadUp,
+        Self::DpadDown,
+        Self::DpadLeft,
+        Self::DpadRight,
+    ];
+
     pub(crate) fn xinput_mask(self) -> u16 {
         match self {
             Self::DpadUp => 0x0001,
@@ -121,6 +139,17 @@ impl GamepadState {
     #[inline]
     pub fn right_trigger(&self) -> f32 {
         self.right_trigger
+    }
+
+    /// The first button that transitioned to pressed this frame, or `None`.
+    ///
+    /// Useful for rebind screens and "press any button" prompts.
+    #[inline]
+    pub fn last_button_pressed(self) -> Option<GamepadButton> {
+        GamepadButton::ALL
+            .iter()
+            .copied()
+            .find(|&b| self.is_button_pressed(b))
     }
 
     /// The driver backend used to read this controller.

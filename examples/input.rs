@@ -200,6 +200,16 @@ fn main() -> Result<(), rukoh::Error> {
                 frame.draw_text(&font, label, Vec2::new(col_right, y_r), colour);
                 y_r += lh + 2.0;
             }
+            let last_btn_str = match pad.last_button_pressed() {
+                Some(btn) => format!("Last pressed: {btn:?}"),
+                None => "Last pressed: —".to_string(),
+            };
+            frame.draw_text(
+                &font,
+                &last_btn_str,
+                Vec2::new(col_left, y_l + lh + 4.0),
+                lit,
+            );
         } else {
             frame.draw_text(&font, "No gamepad connected", Vec2::new(col_left, y_l), dim);
         }
