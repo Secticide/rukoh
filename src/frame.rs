@@ -128,6 +128,13 @@ impl<'a> Frame<'a> {
         }
     }
 
+    /// Draw a filled rounded rectangle.
+    ///
+    /// `radius` is the corner radius in pixels, clamped to half the shorter side.
+    pub fn draw_rect_rounded(&mut self, rect: Rect, radius: f32, colour: Colour) {
+        self.rukoh.batch.draw_rect_rounded(rect, radius, colour);
+    }
+
     /// Draw a filled circle tessellated into 32 triangle segments.
     pub fn draw_circle(&mut self, centre: Vec2, radius: f32, colour: Colour) {
         self.rukoh.batch.draw_circle(centre, radius, colour);

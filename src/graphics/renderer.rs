@@ -440,6 +440,96 @@ impl SpriteBatch {
         self.draw_triangles(&verts, &white_srv);
     }
 
+    /// Draw a filled rounded rectangle.
+    ///
+    /// `radius` is the corner radius in pixels, clamped to half the shorter side.
+    pub fn draw_rect_rounded(&mut self, rect: Rect, radius: f32, colour: Colour) {
+        // Number of triangle-fan segments per corner quarter-arc.
+        const CORNER_SEGS: usize = 8;
+        // Body rects (3) × 2 tris × 3 verts + 4 corners × CORNER_SEGS tris × 3 verts.
+        const VERT_COUNT: usize = 3 * 2 * 3 + 4 * CORNER_SEGS * 3;
+
+        let r = radius.min(rect.w * 0.5).min(rect.h * 0.5).max(0.0);
+        self.flush();
+
+        let col = colour.to_array();
+        let v = |x: f32, y: f32| Vertex {
+            pos: [x, y],
+            uv: [0.5, 0.5],
+            colour: col,
+        };
+
+        let mut verts = [Vertex {
+            pos: [0.0; 2],
+            uv: [0.5; 2],
+            colour: col,
+        }; VERT_COUNT];
+        let mut i = 0;
+
+        // ── Body: 3 rectangles as triangle pairs ──────────────────────────────
+        // Centre vertical strip.
+        let (x0, y0, x1, y1) = (rect.x + r, rect.y, rect.x + rect.w - r, rect.y + rect.h);
+        verts[i] = v(x0, y0);
+        verts[i + 1] = v(x1, y0);
+        verts[i + 2] = v(x1, y1);
+        i += 3;
+        verts[i] = v(x0, y0);
+        verts[i + 1] = v(x1, y1);
+        verts[i + 2] = v(x0, y1);
+        i += 3;
+        // Left cap.
+        let (x0, y0, x1, y1) = (rect.x, rect.y + r, rect.x + r, rect.y + rect.h - r);
+        verts[i] = v(x0, y0);
+        verts[i + 1] = v(x1, y0);
+        verts[i + 2] = v(x1, y1);
+        i += 3;
+        verts[i] = v(x0, y0);
+        verts[i + 1] = v(x1, y1);
+        verts[i + 2] = v(x0, y1);
+        i += 3;
+        // Right cap.
+        let (x0, y0, x1, y1) = (
+            rect.x + rect.w - r,
+            rect.y + r,
+            rect.x + rect.w,
+            rect.y + rect.h - r,
+        );
+        verts[i] = v(x0, y0);
+        verts[i + 1] = v(x1, y0);
+        verts[i + 2] = v(x1, y1);
+        i += 3;
+        verts[i] = v(x0, y0);
+        verts[i + 1] = v(x1, y1);
+        verts[i + 2] = v(x0, y1);
+        i += 3;
+
+        // ── Corners: quarter-arc triangle fans ────────────────────────────────
+        let step = std::f32::consts::FRAC_PI_2 / CORNER_SEGS as f32;
+        let corners = [
+            (rect.x + r, rect.y + r, std::f32::consts::PI), // top-left
+            (
+                rect.x + rect.w - r,
+                rect.y + r,
+                std::f32::consts::FRAC_PI_2 * 3.0,
+            ), // top-right
+            (rect.x + rect.w - r, rect.y + rect.h - r, 0.0_f32), // bottom-right
+            (rect.x + r, rect.y + rect.h - r, std::f32::consts::FRAC_PI_2), // bottom-left
+        ];
+        for (cx, cy, start_angle) in corners {
+            for s in 0..CORNER_SEGS {
+                let a0 = start_angle + s as f32 * step;
+                let a1 = a0 + step;
+                verts[i] = v(cx, cy);
+                verts[i + 1] = v(cx + a0.cos() * r, cy + a0.sin() * r);
+                verts[i + 2] = v(cx + a1.cos() * r, cy + a1.sin() * r);
+                i += 3;
+            }
+        }
+
+        let white_srv = self.white_tex.srv.clone();
+        self.draw_triangles(&verts, &white_srv);
+    }
+
     /// Draw a filled circle tessellated into 32 triangle-list segments.
     pub fn draw_circle(&mut self, centre: Vec2, radius: f32, colour: Colour) {
         const SEGMENTS: usize = 32;

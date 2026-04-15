@@ -122,7 +122,7 @@ fn main() -> Result<(), rukoh::Error> {
         );
 
         // Shapes.
-        frame.draw_rect(Rect::new(10.0, 10.0, 120.0, 60.0), Colour::RED);
+        frame.draw_rect_rounded(Rect::new(10.0, 10.0, 120.0, 60.0), 12.0, Colour::RED);
         frame.draw_rect_lines(Rect::new(10.0, 80.0, 120.0, 60.0), 3.0, Colour::GREEN);
         frame.draw_circle(Vec2::new(w * 0.5, h * 0.5), 45.0, Colour::YELLOW);
         frame.draw_circle_lines(Vec2::new(w * 0.5, h * 0.5), 62.0, 3.0, Colour::CYAN);
