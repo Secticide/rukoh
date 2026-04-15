@@ -371,6 +371,31 @@ impl SpriteBatch {
         );
     }
 
+    /// Draw a circle outline tessellated into 32 rotated quads.
+    pub fn draw_circle_lines(&mut self, centre: Vec2, radius: f32, thickness: f32, colour: Colour) {
+        const SEGMENTS: usize = 32;
+        let step = std::f32::consts::TAU / SEGMENTS as f32;
+        let chord = 2.0 * radius * (step * 0.5).sin();
+        let half_chord = chord * 0.5;
+        let half_thick = thickness * 0.5;
+        let origin = Vec2::new(half_chord, half_thick);
+        let srv = self.white_tex.srv.clone();
+        for i in 0..SEGMENTS {
+            let angle_mid = (i as f32 + 0.5) * step;
+            let px = centre.x + angle_mid.cos() * radius;
+            let py = centre.y + angle_mid.sin() * radius;
+            let rect = Rect::new(px - half_chord, py - half_thick, chord, thickness);
+            self.push_quad(
+                &srv,
+                rect,
+                Rect::new(0.0, 0.0, 1.0, 1.0),
+                angle_mid + std::f32::consts::FRAC_PI_2,
+                origin,
+                colour,
+            );
+        }
+    }
+
     /// Draw a filled circle tessellated into 32 triangle-list segments.
     pub fn draw_circle(&mut self, centre: Vec2, radius: f32, colour: Colour) {
         const SEGMENTS: usize = 32;

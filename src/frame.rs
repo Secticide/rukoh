@@ -104,6 +104,13 @@ impl<'a> Frame<'a> {
         self.rukoh.batch.draw_circle(centre, radius, colour);
     }
 
+    /// Draw a circle outline tessellated into 32 quads.
+    pub fn draw_circle_lines(&mut self, centre: Vec2, radius: f32, thickness: f32, colour: Colour) {
+        self.rukoh
+            .batch
+            .draw_circle_lines(centre, radius, thickness, colour);
+    }
+
     /// Switch the blend mode for all subsequent draw calls this frame.
     ///
     /// Flushes any pending draws before switching. The mode persists until
