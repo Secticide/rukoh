@@ -19,21 +19,23 @@ src/
   error.rs            <- rukoh::Error (Windows, Image, Font, Audio, InvalidState)
   frame.rs            <- Frame<'_> (RAII, drop = flush + present)
   gfx.rs              <- GfxDevice: D3D11 device + IDXGISwapChain
-  math.rs             <- Vec2, Rect
+  maths.rs            <- Vec2, Rect
   colour.rs           <- Colour { r, g, b, a: f32 } + named constants
   window.rs           <- Win32Window, WindowState, message pump
   graphics/
     mod.rs
-    renderer.rs       <- SpriteBatch (batched quad renderer), DrawParams
-    texture.rs        <- Texture2D (RAII, load from &[u8] or raw RGBA)
+    renderer.rs       <- SpriteBatch (batched quad renderer), DrawParams, BlendMode
+    texture.rs        <- Texture2D (RAII, load from &[u8] or raw RGBA), TextureFilter
     camera.rs         <- Camera2D (position, zoom, rotation)
     render_target.rs  <- RenderTarget (Deref<Target=Texture2D>)
     text.rs           <- Font (fontdue glyph atlas)
   input/
     mod.rs            <- InputState, MouseButton
     keyboard.rs       <- KeyCode (VK_ mapped enum)
-    mouse.rs          <- mouse helpers
-    gamepad.rs        <- XInput wrapper, GamepadState
+    gamepad.rs        <- XInput wrapper, GamepadState, GamepadBackend
+    hid/
+      mod.rs          <- HidManager, Raw Input / HID gamepad fallback
+      profiles.rs     <- per-device button mapping profiles (PS4, Switch Pro, generic)
   shaders/            <- sprite.hlsl + compiled sprite_vs.dxbc / sprite_ps.dxbc
   audio/
     mod.rs            <- AudioDevice, SoundParams, decode_ogg helper
@@ -41,14 +43,16 @@ src/
     music.rs          <- Music (fully-decoded OGG, single dedicated voice)
 examples/
   hello_window.rs     <- Phase 1: window, game loop, delta time
-  input.rs            <- Phase 2: keyboard, mouse, gamepad
-  sprites.rs          <- Phase 3: texture loading, sprite drawing, shapes
+  input.rs            <- Phase 2: keyboard, mouse, gamepad — on-screen display
+  sprites.rs          <- Phase 3: texture loading, sprite drawing, shapes, blend modes
   camera.rs           <- Phase 4: camera transforms, render targets, text
   audio.rs            <- Phase 5: background music, sound effects
-  gamepad.rs          <- visual controller layout (all buttons and axes)
+  gamepad.rs          <- visual controller layout (all buttons, axes, backend label)
   breakout.rs         <- full Breakout game (music + sound effects)
   bunnymark.rs        <- rendering stress test (batch_size: 65_536)
-  assets/             <- place font.ttf, music.ogg, impact.ogg, bunny.png, uv-texture.png here
+  assets/             <- lexend.ttf, music.ogg, impact.ogg, bunny.png, uv-texture.png
+planning/
+  sdf-shapes.md       <- future architecture notes: SDF shape rendering
 ```
 
 ## API conventions
@@ -63,6 +67,8 @@ examples/
 - All `unsafe` is private — never in the public API surface.
 - D3D11 / Win32 / XAudio2 FFI stays inside crate internals.
 - **UK English spelling throughout:** `Colour` not `Color`.
+- Constructor params: prefer adding customisation points as named parameters. If a constructor
+  accumulates more than ~3 parameters, propose migrating to a config/builder struct instead.
 
 ## Key types (current)
 
@@ -71,17 +77,22 @@ examples/
 | `Rukoh` | `src/lib.rs` | Owns window, D3D11 device, SpriteBatch, AudioDevice |
 | `RukohConfig` | `src/lib.rs` | See config section below |
 | `Frame<'_>` | `src/frame.rs` | Borrows `&mut Rukoh`. Drop = flush + present |
-| `Texture2D` | `src/graphics/texture.rs` | `load(&app, &[u8])`, `from_pixels(&app, &[u8], w, h)` |
+| `Texture2D` | `src/graphics/texture.rs` | `load(&app, &[u8], filter)`, `from_pixels(&app, &[u8], w, h, filter)` |
+| `TextureFilter` | `src/graphics/texture.rs` | `Point` (default, nearest-neighbour) or `Bilinear` (smooth) |
 | `DrawParams` | `src/graphics/renderer.rs` | dest_rect, source_rect, rotation, origin, tint |
+| `BlendMode` | `src/graphics/renderer.rs` | `Alpha` (default), `Additive`, `Multiplied` |
 | `Camera2D` | `src/graphics/camera.rs` | position (top-left world), zoom, rotation; `centred()`, coord helpers |
 | `RenderTarget` | `src/graphics/render_target.rs` | `Deref<Target=Texture2D>`; `begin/end_texture_mode` |
-| `Font` | `src/graphics/text.rs` | fontdue atlas; `load()` (ASCII) or `load_chars()` |
+| `Font` | `src/graphics/text.rs` | fontdue atlas; `load()` (ASCII) or `load_chars()`; `measure_text()` |
 | `Sound` | `src/audio/sound.rs` | OGG decoded at load; played via shared voice pool |
 | `Music` | `src/audio/music.rs` | OGG decoded at load; dedicated looping voice |
 | `SoundParams` | `src/audio/mod.rs` | `{ volume: f32, pitch: f32 }`, Copy, Default (1.0, 1.0) |
+| `GamepadState` | `src/input/gamepad.rs` | Per-frame snapshot; `is_button_down/pressed/released`, `last_button_pressed`, `backend` |
+| `GamepadBackend` | `src/input/gamepad.rs` | `XInput` or `Hid` — which driver read this controller |
+| `KeyCode` | `src/input/keyboard.rs` | VK_-mapped enum; `from_vk` reverse-maps for `last_key_pressed` |
 | `Colour` | `src/colour.rs` | `{ r, g, b, a: f32 }`, `Copy`, named constants |
-| `Vec2` | `src/math.rs` | `{ x, y: f32 }`, ops, constants |
-| `Rect` | `src/math.rs` | `{ x, y, w, h: f32 }` |
+| `Vec2` | `src/maths.rs` | `{ x, y: f32 }`, ops, constants |
+| `Rect` | `src/maths.rs` | `{ x, y, w, h: f32 }` |
 
 ## RukohConfig
 
@@ -107,6 +118,68 @@ RukohConfig {
 
 `render_size` and `window_mode` are independent: the window can be any size regardless of
 the render resolution. The render resolution is what `frame.width()` / `frame.height()` return.
+
+## Drawing API
+
+```rust
+// Textures
+frame.draw_texture(&tex, pos, tint);
+frame.draw_texture_ex(&tex, &DrawParams { dest_rect, rotation, origin, tint, .. });
+
+// Shapes — filled
+frame.draw_rect(rect, colour);
+frame.draw_rect_ex(rect, origin, rotation, colour);   // rotated rect
+frame.draw_rect_rounded(rect, radius, colour);         // rounded corners
+frame.draw_circle(centre, radius, colour);
+frame.draw_triangle(v1, v2, v3, colour);               // counter-clockwise
+
+// Shapes — outlines
+frame.draw_rect_lines(rect, thickness, colour);
+frame.draw_circle_lines(centre, radius, thickness, colour);
+frame.draw_line(start, end, thickness, colour);
+
+// Text
+frame.draw_text(&font, text, pos, colour);
+let size: Vec2 = font.measure_text(text);  // x = pixel width, y = line height
+
+// Blend modes (persist until changed; restore Alpha when done)
+frame.set_blend_mode(BlendMode::Additive);
+frame.set_blend_mode(BlendMode::Alpha);    // restore
+```
+
+## Input API
+
+```rust
+// Keyboard
+frame.is_key_down(KeyCode::W)
+frame.is_key_pressed(KeyCode::Space)
+frame.is_key_released(KeyCode::Escape)
+frame.last_key_pressed() -> Option<KeyCode>   // first key with rising edge this frame
+
+// Mouse
+frame.mouse_pos() -> Vec2          // render-space pixels
+frame.mouse_delta() -> Vec2
+frame.mouse_scroll() -> f32        // positive = scroll up
+frame.is_mouse_down(MouseButton::Left)
+frame.is_mouse_pressed(MouseButton::Right)
+frame.is_mouse_released(MouseButton::Middle)
+
+// Cursor
+frame.show_cursor()
+frame.hide_cursor()
+
+// Gamepad (XInput primary, HID fallback)
+if let Some(gp) = frame.gamepad() {
+    gp.left_stick() -> Vec2         // radial dead zone applied
+    gp.right_stick() -> Vec2
+    gp.left_trigger() -> f32        // [0, 1]
+    gp.right_trigger() -> f32
+    gp.is_button_down(GamepadButton::South)
+    gp.is_button_pressed(GamepadButton::Start)
+    gp.last_button_pressed() -> Option<GamepadButton>
+    gp.backend() -> GamepadBackend  // XInput or Hid
+}
+```
 
 ## Audio API
 
@@ -163,7 +236,7 @@ frame.draw_texture(&rt, pos, Colour::WHITE); // Deref to Texture2D
 - Sprite batch uses a pre-allocated vertex buffer (`D3D11_MAP_WRITE_DISCARD`). No allocations per draw call.
 - `Colour`, `Vec2`, `Rect`, `DrawParams`, `SoundParams` are `Copy` structs — always passed by value.
 - Index buffer is static (pre-filled u32 indices). One `DrawIndexed` per batch flush.
-- Flush only on texture switch or batch full — minimise `PSSetShaderResources` calls.
+- Flush only on texture/filter switch or batch full — minimise `PSSetShaderResources` and `PSSetSamplers` calls.
 - `push_quad` has a zero-rotation fast path: when `rotation == 0.0`, `sin_cos` and all pivot
   arithmetic are skipped. This covers the vast majority of draw calls (sprites, rects, text glyphs).
 - HLSL shaders compiled to DXBC offline (via `build.rs` + `fxc.exe`) and embedded with `include_bytes!`.
@@ -178,4 +251,4 @@ frame.draw_texture(&rt, pos, Colour::WHITE); // Deref to Texture2D
 4. `cargo clippy` must pass (zero warnings) before a phase is done.
 5. Wait for review before starting the next phase.
 
-See `PLAN.md` for the full 5-phase breakdown and status.
+See `PLAN.md` for the full phase breakdown and status.

@@ -7,6 +7,7 @@
 - [x] Phase 3 — 2D Core Rendering
 - [x] Phase 4 — 2D Advanced Rendering
 - [x] Phase 5 — Audio
+- [x] Phase 6 — Gap Fill
 
 ---
 
@@ -203,3 +204,79 @@ sound_voices: u32  // default 32; shared pool for SFX (music is separate)
 5. ✅ Audio methods on `Frame`.
 6. ✅ `examples/audio.rs`.
 7. ✅ `cargo fmt` + `cargo clippy` clean + user review.
+
+---
+
+## Phase 6 — Gap Fill ✅
+
+**Goal:** Cover missing primitives, input ergonomics, and texture filtering.
+
+**Examples updated:** `sprites`, `input`, `camera`, `bunnymark`
+
+### Features added
+
+#### Drawing primitives
+
+| Feature | API | Notes |
+|---|---|---|
+| Circle outline | `frame.draw_circle_lines(centre, radius, thickness, colour)` | 32 rotated quads via `push_quad`; stays in sprite batch without flush |
+| Filled triangle | `frame.draw_triangle(v1, v2, v3, colour)` | Counter-clockwise winding; flushes batch, emits raw triangle vertices |
+| Rounded rectangle | `frame.draw_rect_rounded(rect, radius, colour)` | CPU tessellation: 3 body rect pairs + 4×8-segment corner arc fans = 114 verts |
+
+#### Input ergonomics
+
+| Feature | API | Notes |
+|---|---|---|
+| Last key pressed | `frame.last_key_pressed() -> Option<KeyCode>` | Populated each frame by scanning rising edges; `KeyCode::from_vk` reverse mapping added |
+| Last button pressed | `gp.last_button_pressed() -> Option<GamepadButton>` | Iterates `GamepadButton::ALL` const array |
+| Cursor show/hide | `frame.show_cursor()` / `frame.hide_cursor()` | Win32 `ShowCursor`; tracked with `cursor_visible: bool` on `Rukoh` to avoid redundant calls |
+
+#### Texture filtering
+
+| Feature | API | Notes |
+|---|---|---|
+| Per-texture filter | `Texture2D::load(&app, bytes, TextureFilter::Point)` | `TextureFilter` enum: `Point` (default) / `Bilinear` |
+| | `Texture2D::from_pixels(&app, pixels, w, h, TextureFilter::Bilinear)` | Both samplers pre-created at startup; switched in `push_quad` on filter change |
+
+#### Input example rewrite
+
+`examples/input.rs` now displays all state on-screen rather than printing to the terminal:
+- Two-column layout: keyboard (left), mouse (right)
+- Gamepad section in lower half: axes/triggers (left column), all 12 buttons (right column)
+- Colour-coded indicators (green = held/active)
+- "Last pressed" display for keyboard and gamepad
+- Press `H` to toggle cursor visibility; ESC to quit
+
+#### HID gamepad backend
+
+| Feature | API | Notes |
+|---|---|---|
+| Backend query | `gp.backend() -> GamepadBackend` | `GamepadBackend::XInput` or `GamepadBackend::Hid` |
+
+See `src/input/hid.rs` for the Raw Input / HID fallback (DualSense, Switch Pro, etc.).
+
+### Design notes
+
+- **`draw_circle_lines`:** Uses `push_quad` with rotated quads rather than the `draw_triangles` path,
+  so circle outlines stay within the sprite batch without forcing a flush.
+- **`draw_rect_rounded`:** All triangles (body rects decomposed into pairs, corners as arc fans).
+  Avoids mixed quad/triangle flush complexity.
+- **SDF analysis:** Deferred. Full architecture analysis (vertex format, HLSL expressions,
+  hybrid approach recommendation) saved in `planning/sdf-shapes.md` for future reference.
+- **`push_quad` parameter limit:** Adding `filter: TextureFilter` reached 8 arguments (clippy limit 7).
+  Added `#[allow(clippy::too_many_arguments)]`. If further customisation points are needed,
+  move to a builder / config struct.
+
+### Tasks
+
+1. ✅ `draw_circle_lines` — `SpriteBatch` + `Frame` delegate
+2. ✅ `draw_triangle` — `SpriteBatch` + `Frame` delegate; counter-clockwise convention
+3. ✅ `show_cursor` / `hide_cursor` on `Frame`
+4. ✅ `last_key_pressed()` on `Frame`; `KeyCode::from_vk` reverse mapping
+5. ✅ `last_button_pressed()` on `GamepadState`; `GamepadButton::ALL` const array
+6. ✅ `TextureFilter` enum; per-texture sampler switching in `push_quad`
+7. ✅ `draw_rect_rounded` — CPU tessellation
+8. ✅ `examples/input.rs` rewritten for on-screen display
+9. ✅ `examples/sprites.rs` updated with new primitives
+10. ✅ `README.md`, `CLAUDE.md`, `PLAN.md` updated
+11. ✅ `cargo fmt` + `cargo clippy` clean + user review.

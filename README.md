@@ -56,7 +56,7 @@ All drawing happens on `Frame`. Textures are loaded from byte slices — use `in
 to embed assets at compile time.
 
 ```rust
-use rukoh::{Colour, DrawParams, Font, Rect, Rukoh, RukohConfig, Texture2D, Vec2};
+use rukoh::{Colour, DrawParams, Font, Rect, Rukoh, RukohConfig, Texture2D, TextureFilter, Vec2};
 
 fn main() -> Result<(), rukoh::Error> {
     let mut app = Rukoh::new(RukohConfig {
@@ -64,7 +64,9 @@ fn main() -> Result<(), rukoh::Error> {
         ..Default::default()
     })?;
 
-    let tex  = Texture2D::load(&app, include_bytes!("assets/player.png"))?;
+    // TextureFilter::Point = nearest-neighbour (default, good for pixel art).
+    // TextureFilter::Bilinear = smooth interpolation (good for UI textures).
+    let tex  = Texture2D::load(&app, include_bytes!("assets/player.png"), TextureFilter::Point)?;
     let font = Font::load(&app, include_bytes!("assets/font.ttf"), 24.0)?;
 
     while let Some(mut frame) = app.next_frame() {
@@ -81,18 +83,46 @@ fn main() -> Result<(), rukoh::Error> {
             ..Default::default()
         });
 
-        // Shapes.
+        // Shapes — filled.
         frame.draw_rect(Rect::new(10.0, 10.0, 80.0, 40.0), Colour::RED);
-        frame.draw_rect_lines(Rect::new(10.0, 60.0, 80.0, 40.0), 2.0, Colour::GREEN);
+        frame.draw_rect_rounded(Rect::new(10.0, 60.0, 80.0, 40.0), 8.0, Colour::ORANGE);
+        frame.draw_rect_ex(Rect::new(200.0, 100.0, 80.0, 40.0), Vec2::new(40.0, 20.0), 0.5, Colour::PURPLE);
         frame.draw_circle(Vec2::new(400.0, 300.0), 50.0, Colour::CYAN);
+        frame.draw_triangle(Vec2::new(500.0, 200.0), Vec2::new(450.0, 280.0), Vec2::new(550.0, 280.0), Colour::YELLOW);
+
+        // Shapes — outlines.
+        frame.draw_rect_lines(Rect::new(10.0, 110.0, 80.0, 40.0), 2.0, Colour::GREEN);
+        frame.draw_circle_lines(Vec2::new(400.0, 300.0), 60.0, 2.0, Colour::WHITE);
         frame.draw_line(Vec2::ZERO, Vec2::new(200.0, 200.0), 2.0, Colour::WHITE);
 
-        // Text (single line).
-        frame.draw_text(&font, "Hello, rukoh!", Vec2::new(10.0, 10.0), Colour::WHITE);
+        // Text — measure before drawing for layout.
+        let label = "Hello, rukoh!";
+        let size = font.measure_text(label); // Vec2 { x: pixel width, y: line height }
+        frame.draw_text(&font, label, Vec2::new(10.0, 10.0), Colour::WHITE);
+        let _ = size;
     }
 
     Ok(())
 }
+```
+
+### Blend modes
+
+Switch the blend mode for particle effects, lighting, or colour overlays. The mode persists
+until changed, so restore `Alpha` when done.
+
+```rust
+use rukoh::BlendMode;
+
+// Additive — pixels are added to the destination (good for glows and particles).
+frame.set_blend_mode(BlendMode::Additive);
+frame.draw_circle(light_pos, 80.0, Colour::new(1.0, 0.9, 0.4, 0.6));
+frame.set_blend_mode(BlendMode::Alpha); // restore
+
+// Multiplied — pixels multiply the destination (good for shadows and colour filters).
+frame.set_blend_mode(BlendMode::Multiplied);
+frame.draw_rect(shadow_rect, Colour::new(0.0, 0.0, 0.0, 0.5));
+frame.set_blend_mode(BlendMode::Alpha);
 ```
 
 ### Input
@@ -107,6 +137,15 @@ while let Some(mut frame) = app.next_frame() {
     if frame.is_key_down(KeyCode::Left)    { /* move */ }
     if frame.is_key_pressed(KeyCode::Space) { /* jump */ }
 
+    // First key pressed this frame — useful for rebind UIs and "press any key" prompts.
+    if let Some(key) = frame.last_key_pressed() {
+        println!("pressed: {key:?}");
+    }
+
+    // Cursor visibility.
+    frame.hide_cursor(); // hide until shown again
+    frame.show_cursor();
+
     // Mouse.
     let pos    = frame.mouse_pos();    // Vec2, in render-space pixels
     let delta  = frame.mouse_delta();
@@ -114,12 +153,20 @@ while let Some(mut frame) = app.next_frame() {
 
     if frame.is_mouse_pressed(MouseButton::Left) { /* click */ }
 
-    // Gamepad (XInput slot 0).
+    // Gamepad (XInput primary, HID fallback for non-XInput controllers).
     if let Some(gp) = frame.gamepad() {
-        let stick = gp.left_stick();  // Vec2 in [-1, 1], radial dead zone applied
+        let stick = gp.left_stick();   // Vec2 in [-1, 1], radial dead zone applied
         let lt    = gp.left_trigger(); // f32 in [0, 1]
 
-        if gp.is_button_pressed(GamepadButton::South) { /* A button */ }
+        if gp.is_button_pressed(GamepadButton::South) { /* A / Cross */ }
+
+        // First button pressed this frame — useful for rebind UIs.
+        if let Some(btn) = gp.last_button_pressed() {
+            println!("pressed: {btn:?}");
+        }
+
+        // Which driver read this controller.
+        println!("backend: {:?}", gp.backend()); // XInput or Hid
     }
 }
 ```
@@ -189,15 +236,15 @@ Each example can be run with `cargo run --example <name>`.
 | Example        | What it demonstrates                                        |
 |----------------|-------------------------------------------------------------|
 | `hello_window` | Window, game loop, delta time                               |
-| `input`        | Keyboard, mouse, and gamepad state                          |
-| `sprites`      | Texture loading, sprite drawing, shapes                     |
+| `input`        | Keyboard, mouse, and gamepad state — on-screen display      |
+| `sprites`      | Texture loading, sprite drawing, shapes, blend modes        |
 | `camera`       | Camera transforms, render targets, text rendering           |
 | `audio`        | Background music, sound effects, volume and pitch control   |
 | `gamepad`      | Visual controller layout showing all buttons and axes live  |
 | `breakout`     | Full Breakout game (music, sound effects, gamepad support)  |
 | `bunnymark`    | Rendering stress test — hold LMB to spawn bunnies           |
 
-Some examples load assets from `examples/assets/` at runtime.
+All examples load assets from `examples/assets/` using `include_bytes!`.
 
 ## Design notes
 
@@ -207,6 +254,9 @@ Some examples load assets from `examples/assets/` at runtime.
   `RukohConfig::batch_size` (default 2 048; set higher for particle systems or stress tests).
 - **No global state.** Everything is owned by `Rukoh` and borrowed through `Frame`.
 - **No unsafe in the public API.** All FFI is behind private module boundaries.
+- **Gamepad support.** XInput is the primary path for Xbox-compatible controllers. A Raw
+  Input / HID fallback handles non-XInput controllers (DualSense, Switch Pro, etc.) with
+  per-device button mapping profiles.
 
 ## Dependencies
 
