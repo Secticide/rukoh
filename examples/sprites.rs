@@ -1,8 +1,15 @@
-use rukoh::{graphics::Texture2D, Colour, DrawParams, KeyCode, Rect, Rukoh, RukohConfig, Vec2};
+use rukoh::{
+    graphics::Texture2D, BlendMode, Colour, DrawParams, KeyCode, Rect, Rukoh, RukohConfig, Vec2,
+    WindowMode,
+};
 
 fn main() -> Result<(), rukoh::Error> {
     let mut app = Rukoh::new(RukohConfig {
         title: "rukoh — sprites",
+        window_mode: WindowMode::Windowed {
+            width: 800,
+            height: 600,
+        },
         ..Default::default()
     })?;
 
@@ -115,6 +122,51 @@ fn main() -> Result<(), rukoh::Error> {
         frame.draw_rect_lines(Rect::new(10.0, 80.0, 120.0, 60.0), 3.0, Colour::GREEN);
         frame.draw_circle(Vec2::new(w * 0.5, h * 0.5), 45.0, Colour::YELLOW);
         frame.draw_line(Vec2::new(0.0, h), Vec2::new(w, 0.0), 2.0, Colour::CYAN);
+
+        // ── Blend mode demonstration ───────────────────────────────────────────
+        //
+        // Three panels, each showing two overlapping semi-transparent circles.
+        // Only the blend mode differs; the geometry and colours are identical.
+        //
+        //  Alpha     — standard compositing: overlap blends red and blue.
+        //  Additive  — overlap adds to the background; circles brighten where
+        //              they meet and against the grey panel.
+        //  Multiplied — overlap multiplies against the background; circles
+        //              darken the panel and tint each other's region.
+        const PANEL_W: f32 = 240.0;
+        const PANEL_H: f32 = 140.0;
+        const PANEL_GAP: f32 = 20.0;
+        const PANEL_Y: f32 = 440.0;
+
+        let panels = [
+            (BlendMode::Alpha, PANEL_GAP),
+            (BlendMode::Additive, PANEL_GAP * 2.0 + PANEL_W),
+            (BlendMode::Multiplied, PANEL_GAP * 3.0 + PANEL_W * 2.0),
+        ];
+
+        for (mode, panel_x) in panels {
+            // Draw the panel background in Alpha mode (always).
+            frame.draw_rect(
+                Rect::new(panel_x, PANEL_Y, PANEL_W, PANEL_H),
+                Colour::new(0.35, 0.35, 0.35, 1.0),
+            );
+
+            let cx = panel_x + PANEL_W * 0.5;
+            let cy = PANEL_Y + PANEL_H * 0.5;
+
+            frame.set_blend_mode(mode);
+            frame.draw_circle(
+                Vec2::new(cx - 22.0, cy),
+                38.0,
+                Colour::new(1.0, 0.2, 0.2, 0.8),
+            );
+            frame.draw_circle(
+                Vec2::new(cx + 22.0, cy),
+                38.0,
+                Colour::new(0.2, 0.4, 1.0, 0.8),
+            );
+            frame.set_blend_mode(BlendMode::Alpha);
+        }
     }
 
     Ok(())

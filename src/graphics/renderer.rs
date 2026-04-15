@@ -8,12 +8,13 @@ use windows::Win32::{
             ID3D11BlendState, ID3D11Buffer, ID3D11Device, ID3D11DeviceContext, ID3D11InputLayout,
             ID3D11PixelShader, ID3D11SamplerState, ID3D11ShaderResourceView, ID3D11VertexShader,
             D3D11_BIND_CONSTANT_BUFFER, D3D11_BIND_INDEX_BUFFER, D3D11_BIND_VERTEX_BUFFER,
-            D3D11_BLEND_DESC, D3D11_BLEND_INV_SRC_ALPHA, D3D11_BLEND_ONE, D3D11_BLEND_OP_ADD,
-            D3D11_BLEND_SRC_ALPHA, D3D11_BUFFER_DESC, D3D11_COLOR_WRITE_ENABLE_ALL,
-            D3D11_CPU_ACCESS_WRITE, D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_INPUT_ELEMENT_DESC,
-            D3D11_INPUT_PER_VERTEX_DATA, D3D11_MAPPED_SUBRESOURCE, D3D11_MAP_WRITE_DISCARD,
-            D3D11_RENDER_TARGET_BLEND_DESC, D3D11_SAMPLER_DESC, D3D11_SUBRESOURCE_DATA,
-            D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_USAGE_DYNAMIC, D3D11_USAGE_IMMUTABLE,
+            D3D11_BLEND, D3D11_BLEND_DESC, D3D11_BLEND_DEST_COLOR, D3D11_BLEND_INV_SRC_ALPHA,
+            D3D11_BLEND_ONE, D3D11_BLEND_OP_ADD, D3D11_BLEND_SRC_ALPHA, D3D11_BUFFER_DESC,
+            D3D11_COLOR_WRITE_ENABLE_ALL, D3D11_CPU_ACCESS_WRITE, D3D11_FILTER_MIN_MAG_MIP_POINT,
+            D3D11_INPUT_ELEMENT_DESC, D3D11_INPUT_PER_VERTEX_DATA, D3D11_MAPPED_SUBRESOURCE,
+            D3D11_MAP_WRITE_DISCARD, D3D11_RENDER_TARGET_BLEND_DESC, D3D11_SAMPLER_DESC,
+            D3D11_SUBRESOURCE_DATA, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_USAGE_DYNAMIC,
+            D3D11_USAGE_IMMUTABLE,
         },
         Dxgi::Common::{
             DXGI_FORMAT_R32G32B32A32_FLOAT, DXGI_FORMAT_R32G32_FLOAT, DXGI_FORMAT_R32_UINT,
@@ -62,6 +63,31 @@ impl Default for DrawParams {
     }
 }
 
+/// Controls how source pixels are composited onto the render target.
+///
+/// Set with [`Frame::set_blend_mode`](crate::Frame::set_blend_mode).
+/// The mode persists until changed; it does **not** reset automatically at
+/// the start of each frame, so call `set_blend_mode(BlendMode::Alpha)` to
+/// restore the default when done.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum BlendMode {
+    /// Standard alpha compositing: `src * src_alpha + dst * (1 − src_alpha)`.
+    ///
+    /// This is the default.
+    #[default]
+    Alpha,
+    /// Additive blending: `src * src_alpha + dst`.
+    ///
+    /// Useful for glows, particles, and lighting effects — pixels are always
+    /// brightened, never darkened.
+    Additive,
+    /// Multiplicative blending: `src * dst_colour + dst * (1 − src_alpha)`.
+    ///
+    /// Darkens the destination using the source colour; useful for shadows
+    /// and colour-filter overlays.
+    Multiplied,
+}
+
 /// Batched 2D quad renderer.
 ///
 /// All draw calls within a frame are collected, sorted by texture, and issued
@@ -77,7 +103,10 @@ pub struct SpriteBatch {
     pixel_shader: ID3D11PixelShader,
     input_layout: ID3D11InputLayout,
     sampler: ID3D11SamplerState,
-    blend: ID3D11BlendState,
+    blend_alpha: ID3D11BlendState,
+    blend_additive: ID3D11BlendState,
+    blend_multiplied: ID3D11BlendState,
+    current_blend: BlendMode,
 
     /// 1×1 white RGBA texture used for solid shapes.
     pub(crate) white_tex: Texture2D,
@@ -111,7 +140,27 @@ impl SpriteBatch {
         let (vertex_shader, input_layout) = create_vertex_shader(device, vs_bytecode)?;
         let pixel_shader = create_pixel_shader(device, ps_bytecode)?;
         let sampler = create_sampler(device)?;
-        let blend = create_blend_state(device)?;
+        let blend_alpha = make_blend_state(
+            device,
+            D3D11_BLEND_SRC_ALPHA,
+            D3D11_BLEND_INV_SRC_ALPHA,
+            D3D11_BLEND_ONE,
+            D3D11_BLEND_INV_SRC_ALPHA,
+        )?;
+        let blend_additive = make_blend_state(
+            device,
+            D3D11_BLEND_SRC_ALPHA,
+            D3D11_BLEND_ONE,
+            D3D11_BLEND_ONE,
+            D3D11_BLEND_ONE,
+        )?;
+        let blend_multiplied = make_blend_state(
+            device,
+            D3D11_BLEND_DEST_COLOR,
+            D3D11_BLEND_INV_SRC_ALPHA,
+            D3D11_BLEND_ONE,
+            D3D11_BLEND_INV_SRC_ALPHA,
+        )?;
 
         let white_tex = Texture2D::from_rgba8(device, &[255, 255, 255, 255], 1, 1)?;
 
@@ -132,7 +181,10 @@ impl SpriteBatch {
             pixel_shader,
             input_layout,
             sampler,
-            blend,
+            blend_alpha,
+            blend_additive,
+            blend_multiplied,
+            current_blend: BlendMode::Alpha,
             white_tex,
             vertices,
             quad_count: 0,
@@ -164,7 +216,7 @@ impl SpriteBatch {
             ctx.VSSetConstantBuffers(0, Some(&[Some(self.const_buf.clone())]));
             ctx.PSSetShader(Some(&self.pixel_shader), None);
             ctx.PSSetSamplers(0, Some(&[Some(self.sampler.clone())]));
-            ctx.OMSetBlendState(Some(&self.blend), None, 0xFFFF_FFFF);
+            ctx.OMSetBlendState(Some(self.active_blend_state()), None, 0xFFFF_FFFF);
         }
     }
 
@@ -199,6 +251,27 @@ impl SpriteBatch {
     pub fn reset_projection(&mut self, width: u32, height: u32) -> Result<(), Error> {
         self.flush();
         upload_projection(&self.context, &self.const_buf, width, height)
+    }
+
+    /// Flush pending draws and switch to the given blend mode.
+    pub fn set_blend_mode(&mut self, mode: BlendMode) {
+        if self.current_blend == mode {
+            return;
+        }
+        self.flush();
+        self.current_blend = mode;
+        unsafe {
+            self.context
+                .OMSetBlendState(Some(self.active_blend_state()), None, 0xFFFF_FFFF);
+        }
+    }
+
+    fn active_blend_state(&self) -> &ID3D11BlendState {
+        match self.current_blend {
+            BlendMode::Alpha => &self.blend_alpha,
+            BlendMode::Additive => &self.blend_additive,
+            BlendMode::Multiplied => &self.blend_multiplied,
+        }
     }
 }
 
@@ -651,18 +724,23 @@ fn create_sampler(device: &ID3D11Device) -> Result<ID3D11SamplerState, Error> {
     Ok(s.unwrap())
 }
 
-fn create_blend_state(device: &ID3D11Device) -> Result<ID3D11BlendState, Error> {
+fn make_blend_state(
+    device: &ID3D11Device,
+    src_blend: D3D11_BLEND,
+    dest_blend: D3D11_BLEND,
+    src_blend_alpha: D3D11_BLEND,
+    dest_blend_alpha: D3D11_BLEND,
+) -> Result<ID3D11BlendState, Error> {
     let rt = D3D11_RENDER_TARGET_BLEND_DESC {
         BlendEnable: BOOL(1),
-        SrcBlend: D3D11_BLEND_SRC_ALPHA,
-        DestBlend: D3D11_BLEND_INV_SRC_ALPHA,
+        SrcBlend: src_blend,
+        DestBlend: dest_blend,
         BlendOp: D3D11_BLEND_OP_ADD,
-        SrcBlendAlpha: D3D11_BLEND_ONE,
-        DestBlendAlpha: D3D11_BLEND_INV_SRC_ALPHA,
+        SrcBlendAlpha: src_blend_alpha,
+        DestBlendAlpha: dest_blend_alpha,
         BlendOpAlpha: D3D11_BLEND_OP_ADD,
         RenderTargetWriteMask: D3D11_COLOR_WRITE_ENABLE_ALL.0 as u8,
     };
-
     let desc = D3D11_BLEND_DESC {
         RenderTarget: [
             rt,
@@ -676,7 +754,6 @@ fn create_blend_state(device: &ID3D11Device) -> Result<ID3D11BlendState, Error> 
         ],
         ..Default::default()
     };
-
     let mut b: Option<ID3D11BlendState> = None;
     unsafe { device.CreateBlendState(&desc, Some(&mut b))? };
     Ok(b.unwrap())

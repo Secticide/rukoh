@@ -1,6 +1,6 @@
 use crate::{
     audio::{Music, Sound, SoundParams},
-    graphics::{Font, RenderTarget, Texture2D},
+    graphics::{BlendMode, Font, RenderTarget, Texture2D},
     Camera2D, Colour, DrawParams, Error, GamepadState, KeyCode, MouseButton, Rect, Rukoh, Vec2,
 };
 
@@ -91,6 +91,21 @@ impl<'a> Frame<'a> {
     /// Draw a filled circle tessellated into 32 triangle segments.
     pub fn draw_circle(&mut self, centre: Vec2, radius: f32, colour: Colour) {
         self.rukoh.batch.draw_circle(centre, radius, colour);
+    }
+
+    /// Switch the blend mode for all subsequent draw calls this frame.
+    ///
+    /// Flushes any pending draws before switching. The mode persists until
+    /// changed again — it does **not** reset automatically at the start of the
+    /// next frame, so restore [`BlendMode::Alpha`] when done:
+    ///
+    /// ```ignore
+    /// frame.set_blend_mode(BlendMode::Additive);
+    /// // ... draw particles ...
+    /// frame.set_blend_mode(BlendMode::Alpha);
+    /// ```
+    pub fn set_blend_mode(&mut self, mode: BlendMode) {
+        self.rukoh.batch.set_blend_mode(mode);
     }
 
     /// Draw a single line of text. `pos` is the top-left of the text bounding box.

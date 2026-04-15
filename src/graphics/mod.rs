@@ -6,6 +6,6 @@ pub mod texture;
 
 pub use camera::Camera2D;
 pub use render_target::RenderTarget;
-pub use renderer::{DrawParams, SpriteBatch};
+pub use renderer::{BlendMode, DrawParams, SpriteBatch};
 pub use text::Font;
 pub use texture::Texture2D;
