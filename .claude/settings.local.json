@@ -5,7 +5,9 @@
       "Bash(cmd:*)",
       "Bash(PATH=\"/c/Users/secti/.cargo/bin:$PATH\" cargo clippy:*)",
       "Bash(cargo run:*)",
-      "Bash(kill %1)"
+      "Bash(kill %1)",
+      "Bash(cargo fmt *)",
+      "Bash(cargo clippy *)"
     ]
   },
   "spinnerTipsEnabled": true

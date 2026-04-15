@@ -66,6 +66,22 @@ impl Font {
     pub fn line_height(&self) -> f32 {
         self.ascent
     }
+
+    /// Measure the pixel dimensions of `text` as it would be drawn by
+    /// [`Frame::draw_text`](crate::Frame::draw_text).
+    ///
+    /// Returns `Vec2 { x: width, y: line_height }`. The height is always the
+    /// full line height regardless of which glyphs appear in the string,
+    /// making it safe to use for consistent UI layout. Unknown characters are
+    /// skipped (zero width), matching the draw behaviour.
+    pub fn measure_text(&self, text: &str) -> Vec2 {
+        let width = text
+            .chars()
+            .filter_map(|c| self.glyphs.get(&c))
+            .map(|g| g.advance_width)
+            .sum();
+        Vec2::new(width, self.ascent)
+    }
 }
 
 // ── Internal atlas builder ────────────────────────────────────────────────────

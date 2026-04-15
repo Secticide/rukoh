@@ -1,11 +1,15 @@
 use rukoh::{
     graphics::Texture2D, Camera2D, Colour, DrawParams, Font, KeyCode, MouseButton, Rect,
-    RenderTarget, Rukoh, RukohConfig, Vec2,
+    RenderTarget, Rukoh, RukohConfig, Vec2, WindowMode,
 };
 
 fn main() -> Result<(), rukoh::Error> {
     let mut app = Rukoh::new(RukohConfig {
         title: "rukoh — camera & text",
+        window_mode: WindowMode::Windowed {
+            width: 800,
+            height: 600,
+        },
         ..Default::default()
     })?;
 
@@ -123,15 +127,24 @@ fn main() -> Result<(), rukoh::Error> {
             Colour::WHITE,
         );
 
-        // Show mouse world position.
+        // Show mouse world position. Draw a tight outline box sized by
+        // measure_text so you can verify it tracks the string width correctly.
         let mouse_world = camera.screen_to_world(frame.mouse_pos(), frame.width(), frame.height());
         let coord_str = format!("World ({:.0}, {:.0})", mouse_world.x, mouse_world.y);
-        frame.draw_text(
-            &font,
-            &coord_str,
-            Vec2::new(8.0, h - 28.0),
-            Colour::LIGHT_GREY,
+        let text_pos = Vec2::new(8.0, h - 28.0);
+        let text_size = font.measure_text(&coord_str);
+        const PAD: f32 = 4.0;
+        frame.draw_rect_lines(
+            Rect::new(
+                text_pos.x - PAD,
+                text_pos.y - PAD,
+                text_size.x + PAD * 2.0,
+                text_size.y + PAD * 2.0,
+            ),
+            1.0,
+            Colour::new(1.0, 1.0, 0.0, 0.6),
         );
+        frame.draw_text(&font, &coord_str, text_pos, Colour::LIGHT_GREY);
     }
 
     Ok(())
