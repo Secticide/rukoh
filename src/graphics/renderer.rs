@@ -321,6 +321,23 @@ impl SpriteBatch {
         );
     }
 
+    /// Draw a filled rectangle with a rotation (in radians) around `origin`.
+    ///
+    /// `origin` is the pivot point in rect-local pixels relative to the
+    /// rect's top-left corner. `Vec2::ZERO` rotates around the top-left;
+    /// `Vec2::new(rect.w * 0.5, rect.h * 0.5)` rotates around the centre.
+    pub fn draw_rect_ex(&mut self, rect: Rect, origin: Vec2, rotation: f32, colour: Colour) {
+        let srv = self.white_tex.srv.clone();
+        self.push_quad(
+            &srv,
+            rect,
+            Rect::new(0.0, 0.0, 1.0, 1.0),
+            rotation,
+            origin,
+            colour,
+        );
+    }
+
     /// Draw a hollow rectangle outline.
     pub fn draw_rect_lines(&mut self, rect: Rect, thickness: f32, colour: Colour) {
         let t = thickness;

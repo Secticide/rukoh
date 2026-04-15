@@ -123,6 +123,16 @@ fn main() -> Result<(), rukoh::Error> {
         frame.draw_circle(Vec2::new(w * 0.5, h * 0.5), 45.0, Colour::YELLOW);
         frame.draw_line(Vec2::new(0.0, h), Vec2::new(w, 0.0), 2.0, Colour::CYAN);
 
+        // Rotated rectangle — pivots around its centre.
+        let rr_w = 100.0f32;
+        let rr_h = 50.0f32;
+        frame.draw_rect_ex(
+            Rect::new(w - 160.0, 20.0, rr_w, rr_h),
+            Vec2::new(rr_w * 0.5, rr_h * 0.5),
+            uv_rot * 2.0, // reuse the uv sprite's angle for variety
+            Colour::ORANGE,
+        );
+
         // ── Blend mode demonstration ───────────────────────────────────────────
         //
         // Three panels, each showing two overlapping semi-transparent circles.
