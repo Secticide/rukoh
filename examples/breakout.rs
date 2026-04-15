@@ -439,16 +439,9 @@ fn main() -> Result<(), rukoh::Error> {
         ..Default::default()
     })?;
 
-    // Font — tries examples/assets/font.ttf, then Windows system fonts.
-    let font_bytes: Vec<u8> = if std::path::Path::new("examples/assets/font.ttf").exists() {
-        std::fs::read("examples/assets/font.ttf").unwrap()
-    } else {
-        std::fs::read(r"C:\Windows\Fonts\segoeui.ttf")
-            .or_else(|_| std::fs::read(r"C:\Windows\Fonts\arial.ttf"))
-            .expect("No font found — place a TTF at examples/assets/font.ttf")
-    };
-    let font = Font::load(&app, &font_bytes, 18.0)?;
-    let font_lg = Font::load(&app, &font_bytes, 42.0)?;
+    let font_bytes = include_bytes!("assets/lexend.ttf");
+    let font = Font::load(&app, font_bytes, 18.0)?;
+    let font_lg = Font::load(&app, font_bytes, 42.0)?;
 
     // Audio.
     let impact_bytes =

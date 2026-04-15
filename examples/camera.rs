@@ -28,16 +28,7 @@ fn main() -> Result<(), rukoh::Error> {
     }
     let world_tex = Texture2D::from_pixels(&app, &px, TEX, TEX)?;
 
-    // Font for UI text — tries examples/assets/font.ttf first, then Windows Segoe UI.
-    // Place any TTF at examples/assets/font.ttf to override.
-    let font_bytes: Vec<u8> = if std::path::Path::new("examples/assets/font.ttf").exists() {
-        std::fs::read("examples/assets/font.ttf").unwrap()
-    } else {
-        std::fs::read(r"C:\Windows\Fonts\segoeui.ttf")
-            .or_else(|_| std::fs::read(r"C:\Windows\Fonts\arial.ttf"))
-            .expect("No font found — place a TTF at examples/assets/font.ttf")
-    };
-    let font = Font::load(&app, &font_bytes, 20.0)?;
+    let font = Font::load(&app, include_bytes!("assets/lexend.ttf"), 20.0)?;
 
     // Off-screen render target (half the render size).
     let rt = RenderTarget::new(&app, 400, 300)?;

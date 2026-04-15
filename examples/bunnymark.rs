@@ -31,15 +31,7 @@ fn main() -> Result<(), rukoh::Error> {
     let bw = bunny.width as f32;
     let bh = bunny.height as f32;
 
-    // Try a project-local font first, then fall back to system fonts.
-    let font_bytes: Vec<u8> = if std::path::Path::new("examples/assets/font.ttf").exists() {
-        std::fs::read("examples/assets/font.ttf").unwrap()
-    } else {
-        std::fs::read(r"C:\Windows\Fonts\segoeui.ttf")
-            .or_else(|_| std::fs::read(r"C:\Windows\Fonts\arial.ttf"))
-            .expect("No font found — place a TTF at examples/assets/font.ttf")
-    };
-    let font = Font::load(&app, &font_bytes, 20.0)?;
+    let font = Font::load(&app, include_bytes!("assets/lexend.ttf"), 20.0)?;
 
     // ── State ─────────────────────────────────────────────────────────────────
 

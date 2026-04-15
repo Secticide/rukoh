@@ -19,16 +19,7 @@ fn main() -> Result<(), rukoh::Error> {
     let music = Music::load(&app, &music_bytes)?;
     let impact = Sound::load(&app, &impact_bytes)?;
 
-    // ── Font for on-screen instructions ──────────────────────────────────────
-
-    let font_bytes: Vec<u8> = if std::path::Path::new("examples/assets/font.ttf").exists() {
-        std::fs::read("examples/assets/font.ttf").unwrap()
-    } else {
-        std::fs::read(r"C:\Windows\Fonts\segoeui.ttf")
-            .or_else(|_| std::fs::read(r"C:\Windows\Fonts\arial.ttf"))
-            .expect("No font found — place a TTF at examples/assets/font.ttf")
-    };
-    let font = Font::load(&app, &font_bytes, 20.0)?;
+    let font = Font::load(&app, include_bytes!("assets/lexend.ttf"), 20.0)?;
 
     let mut music_playing = false;
     let mut music_volume = 1.0f32;
