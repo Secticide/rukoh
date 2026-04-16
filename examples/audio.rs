@@ -1,11 +1,17 @@
 // Place OGG files at:
 //   examples/assets/music.ogg    — background music (looping)
 //   examples/assets/impact.ogg   — sound effect (Space to trigger)
-use rukoh::{Colour, Font, KeyCode, Music, Rukoh, RukohConfig, Sound, SoundParams, Vec2};
+use rukoh::{
+    Colour, Font, KeyCode, Music, Rukoh, RukohConfig, Sound, SoundParams, Vec2, WindowMode,
+};
 
 fn main() -> Result<(), rukoh::Error> {
     let mut app = Rukoh::new(RukohConfig {
         title: "rukoh — audio",
+        window_mode: WindowMode::Windowed {
+            width: 800,
+            height: 600,
+        },
         ..Default::default()
     })?;
 

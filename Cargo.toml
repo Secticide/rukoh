@@ -12,6 +12,7 @@ fontdue = "0.9"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "bmp", "tga"] }
 lewton = "0.10"
 windows = { version = "0.58", features = [
+    "implement",
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging",
     "Win32_Graphics_Direct3D11",

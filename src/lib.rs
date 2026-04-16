@@ -228,7 +228,10 @@ impl Rukoh {
         // Always drain buffered HID reports (even when XInput won this frame).
         self.window.state.hid_reports.clear();
 
-        // ── 6. Delta time ─────────────────────────────────────────────────────
+        // ── 6. Audio device tick ─────────────────────────────────────────────
+        self.audio.tick();
+
+        // ── 7. Delta time ─────────────────────────────────────────────────────
         let mut now: i64 = 0;
         unsafe {
             let _ = QueryPerformanceCounter(&mut now);
@@ -241,7 +244,7 @@ impl Rukoh {
         };
         self.last_frame_time = now;
 
-        // ── 7. Bind the rendering pipeline for this frame ─────────────────────
+        // ── 8. Bind the rendering pipeline for this frame ─────────────────────
         self.batch.begin_frame();
 
         Some(Frame::new(self, dt))
